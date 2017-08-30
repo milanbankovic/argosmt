@@ -1,0 +1,760 @@
+/****************************************************************************
+argosmt (an open source SMT solver)
+Copyright (C) 2010-2015 Milan Bankovic (milan@matf.bg.ac.rs)
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+***************************************************************************/
+
+%{
+
+int yylex();
+
+#define yyerror(X) 
+
+#define YYMAXDEPTH 1000000
+
+/*int yyerror(const char * fmt, ...) {
+ return 0;
+}*/
+
+#include "smtlib_api.hpp"
+
+bool active_error = false;
+std::istream * yy_istream = 0;
+smtlib_api * yy_api = 0;
+
+sorted_variable_vector vars;
+sort_parameter_vector pars;
+sort_parameter dummy_par("");
+sorted_variable dummy_var("", sort());
+
+%}
+	
+%token<str_attr> NUMERAL;
+%token<str_attr> DECIMAL;
+%token<str_attr> HEXADECIMAL;
+%token<str_attr> BINARY;
+%token<str_attr> STRING_LITERAL;
+%token RW_PAR;
+%token RW_NUMERAL;
+%token RW_DECIMAL;
+%token RW_STRING;
+%token RW_UNDERSCORE;
+%token RW_EXCLAMATION;
+%token RW_AS;
+%token RW_LET;
+%token RW_FORALL;
+%token RW_EXISTS;
+%token RW_SET_LOGIC;
+%token RW_SET_OPTION;
+%token RW_SET_INFO;
+%token RW_DECLARE_SORT;
+%token RW_DEFINE_SORT;
+%token RW_EXPAND_SORT;
+%token RW_DECLARE_FUN;
+%token RW_DEFINE_FUN;
+%token RW_EXPAND_TERM;
+%token RW_PUSH;
+%token RW_POP;
+%token RW_ASSERT;
+%token RW_CHECK_SAT;
+%token RW_GET_SORT;
+%token RW_GET_ASSERTIONS;
+%token RW_GET_PROOF;
+%token RW_GET_UNSAT_CORE;
+%token RW_GET_VALUE;
+%token RW_GET_ASSIGNMENT;
+%token RW_GET_OPTION;
+%token RW_GET_INFO;
+%token RW_EXIT;
+%token<str_attr> SYMBOL;
+%token<str_attr> KEYWORD;
+
+%type<attr_attr> option
+%type<attr_attr> attribute
+%type<attr_val_attr> attribute_value
+%type<attr_val_v_attr> attribute_value_seq
+%type<attr_s_attr> attribute_seq 
+%type<attr_s_attr> attribute_ne_seq
+%type<sc_attr> spec_constant
+%type<sort_par_v_attr> sort_par_seq
+%type<sort_v_attr> sort_seq
+%type<sort_v_attr> sort_ne_seq
+%type<sort_attr> sort
+%type<id_attr> indexed_identifier
+%type<id_attr> identifier
+%type<ss_attr> sort_symbol
+%type<fs_attr> function_symbol
+%type<num_v_attr> numeral_seq
+%type<num_v_attr> numeral_ne_seq
+%type<sort_var_v_attr> sorted_var_seq
+%type<sort_var_v_attr> sorted_var_ne_seq
+%type<sort_var_attr> sorted_var
+%type<term_attr> term
+%type<vb_attr> var_binding
+%type<vb_v_attr> var_binding_seq
+%type<vb_v_attr> var_binding_ne_seq
+%type<term_v_attr> term_seq
+%type<term_v_attr> term_ne_seq
+
+%union {
+      std::string * str_attr;
+      attribute * attr_attr;
+      attribute_value * attr_val_attr;
+      attribute_value_vector * attr_val_v_attr;
+      attribute_set * attr_s_attr;
+      special_constant * sc_attr;
+      sort_parameter_vector * sort_par_v_attr;
+      sort * sort_attr;
+      sort_vector * sort_v_attr;
+      identifier * id_attr;
+      sort_symbol * ss_attr;
+      function_symbol * fs_attr;
+      identifier::index_vector * num_v_attr;      
+      sorted_variable_vector * sort_var_v_attr;
+      sorted_variable * sort_var_attr;
+      expression * term_attr;
+      variable_binding * vb_attr;
+      variable_binding_vector * vb_v_attr;
+      expression_vector * term_v_attr;
+}
+
+%%
+
+
+script : script command
+       | script error
+       {
+       if(!active_error)
+       	 throw syntax_error_exception();
+       }
+       |
+       ;
+  
+
+command : '(' RW_SET_LOGIC SYMBOL ')'
+	{
+	  yy_api->set_logic(*$3);
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	  delete $3;         
+	}
+        | '(' RW_SET_OPTION option ')'
+	{
+	  yy_api->set_option(*$3);
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+          delete $3; 
+	}
+        | '(' RW_SET_INFO attribute ')'
+	{
+	  yy_api->set_info(*$3);
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	  delete $3; 
+	}
+        | '(' RW_DECLARE_SORT sort_symbol NUMERAL ')'
+	{
+	  yy_api->declare_sort(*$3, atoi($4->c_str()));
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	  delete $3;
+	  delete $4;
+	}
+        | '(' RW_DEFINE_SORT sort_symbol '(' sort_par_seq ')' sort ')'
+	{
+	  yy_api->define_sort(*$3, std::move(*$5), *$7);
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	  delete $3;
+	  delete $5;
+	  delete $7;
+	}
+	| '(' RW_EXPAND_SORT sort ')'
+	{
+	  yy_api->cout() << yy_api->expand_sort(*$3) << std::endl;
+	  delete $3;
+	}
+        | '(' RW_DECLARE_FUN function_symbol '(' sort_seq ')' sort ')'
+	{
+	  $5->push_back(*$7);
+	  yy_api->declare_function(*$3, std::move(*$5));
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	  delete $3;
+	  delete $5;
+	  delete $7;
+	}
+	| '(' RW_DECLARE_FUN RW_PAR '(' sort_par_seq ')' function_symbol '(' sort_seq ')' sort ')'
+	{
+	  $9->push_back(*$11);
+	  yy_api->declare_function(*$7, std::move(*$9));
+	  std::size_t n = $5->size();
+	  pars.resize(pars.size() - n, dummy_par);
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	  delete $5;
+	  delete $7;
+	  delete $9;
+	  delete $11;
+	}
+        | '(' RW_DEFINE_FUN function_symbol '(' sorted_var_seq ')' sort term ')'
+	{
+	  yy_api->define_function(*$3, std::move(*$5), *$7, *$8);
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	 
+	  delete $3;
+	  delete $5;
+	  delete $7;
+	  delete $8;
+	}
+	| '(' RW_EXPAND_TERM term ')'
+	{
+	  yy_api->cout() << yy_api->expand_expression(*$3) << std::endl;
+	  delete $3;
+	}
+        | '(' RW_PUSH NUMERAL ')'
+	{
+	  yy_api->push(atoi($3->c_str()));
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	  delete $3;
+	}	
+        | '(' RW_POP NUMERAL ')'
+	{
+	  yy_api->pop(atoi($3->c_str()));
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	  delete $3;
+	}
+        | '(' RW_ASSERT term ')'
+	{
+	  yy_api->assert_expression(*$3);
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	  delete $3;
+	}
+	| '(' RW_GET_SORT term ')'
+	{
+	  if(yy_api->expand_definitions())
+	   yy_api->cout() << yy_api->expand_sort((*$3)->get_sort()) << std::endl;
+	  else
+	   yy_api->cout() << (*$3)->get_sort() << std::endl;
+	  delete $3;
+	}
+        | '(' RW_CHECK_SAT ')'
+	{
+	
+	yy_api->check_sat();
+	yy_api->get_info(keyword::STATUS)->print_value(yy_api->cout());
+	yy_api->cout() << std::endl;	
+	}
+        | '(' RW_GET_ASSERTIONS ')'
+	{
+	const expression_vector assertions = yy_api->get_assertions();
+	yy_api->cout() << "(";
+	for(expression_vector::const_iterator it = assertions.begin(),
+            it_end = assertions.end(); it != it_end; ++it)
+          {
+	     if(yy_api->expand_definitions())
+               yy_api->cout() << yy_api->expand_expression(*it) << " ";
+             else
+               yy_api->cout() << *it << " "; 
+          }
+	yy_api->cout() << ")" << std::endl;
+	}
+        | '(' RW_GET_PROOF ')'
+	{
+	proof * pr = yy_api->get_proof();
+	pr->print_proof(yy_api->cout());
+	yy_api->cout() << std::endl;
+	}
+        | '(' RW_GET_UNSAT_CORE ')'
+	{
+	 expression_vector core = yy_api->get_unsat_core();
+	 yy_api->cout() << "(";
+         for(expression_vector::const_iterator it = core.begin(),
+            it_end = core.end(); it != it_end; ++it)
+          {
+             if(yy_api->expand_definitions())
+               yy_api->cout() << yy_api->expand_expression(*it) << " ";
+             else
+               yy_api->cout() << *it << " "; 
+          }
+	  yy_api->cout() << ")" << std::endl;
+	}
+        | '(' RW_GET_VALUE '(' term_ne_seq ')' ')'
+	{
+	 expression_vector assign = yy_api->get_value(*$4);
+	 yy_api->cout() << "(";
+         for(expression_vector::const_iterator it = assign.begin(),
+            it_end = assign.end(); it != it_end; ++it)
+          {
+	    yy_api->cout() << "(" << *it << " " << (*it)->get_assigned() << ") "; 
+          }
+	  yy_api->cout() << ")" << std::endl;
+	  delete $4;
+	}
+        | '(' RW_GET_ASSIGNMENT ')'
+	{
+	   expression_vector assign = yy_api->get_assignment();
+       	 yy_api->cout() << "(";
+         for(expression_vector::const_iterator it = assign.begin(),
+            it_end = assign.end(); it != it_end; ++it)
+          {
+	    yy_api->cout() << "(" << *it << " " << (*it)->get_assigned() << ") "; 
+          }
+	  yy_api->cout() << ")" << std::endl;
+
+	}
+        | '(' RW_GET_OPTION KEYWORD ')'
+	{
+	attribute_value * value = yy_api->get_option(*$3);
+	if(value)
+	{  
+          value->print_value(yy_api->cout());
+        }
+        yy_api->cout() << std::endl;
+	delete $3;   
+	}
+        | '(' RW_GET_INFO KEYWORD ')'
+	{
+        attribute_value * value = yy_api->get_info(*$3);
+	if(*$3 == keyword::ALL_STATISTICS.get_name())
+	{
+	  yy_api->cout() << "(";
+	}
+	else
+	{
+	  yy_api->cout() << "(" << *$3 << " ";	
+	}
+	
+	if(value)
+	{
+	  value->print_value(yy_api->cout());
+	}
+	yy_api->cout() << ")" << std::endl; 
+	delete $3;   
+	}
+        | '(' RW_EXIT ')'
+	{
+	  YYACCEPT;
+	}
+        ;
+
+option : attribute
+       {
+          $$ = $1;
+       }
+       ;
+
+attribute: KEYWORD 
+	 {
+	   $$ = new attribute(*$1);
+	   delete $1;	   
+	 }
+         | KEYWORD attribute_value
+	 {
+	   $$ = new attribute(*$1, $2);
+	   delete $1;
+	 }
+         ;
+
+attribute_value: spec_constant
+	       {
+	         $$ = new standard_attribute_value<special_constant>(*$1);
+		 delete $1;
+	       }
+               | SYMBOL
+	       {
+	         $$ = new standard_attribute_value<symbol>(*$1);
+		 delete $1;
+	       }
+               | '(' attribute_value_seq ')'   
+	       {
+	         $$ = new composite_attribute_value(std::move(*$2));
+		 delete $2;	         
+	       }
+               ;
+
+attribute_seq: attribute_seq attribute
+	     {
+	       $$ = $1;
+	       $$->insert(std::move(*$2));
+	       delete $2;
+	     }
+             |
+	     {
+	      $$ = new attribute_set(HASH_TABLE_SIZE);
+	     }
+             ;
+
+attribute_ne_seq: attribute_seq attribute
+		{
+	         $$ = $1;
+	         $$->insert(std::move(*$2));
+	         delete $2;
+		}
+                ;
+
+spec_constant: NUMERAL 
+	       {
+	          $$ = new special_constant(special_constant::T_NUMERAL, *$1);
+		  delete $1;
+	       }
+             | DECIMAL
+	     {
+	          $$ = new special_constant(special_constant::T_DECIMAL, *$1);
+		  delete $1;
+	     }
+             | BINARY
+             {
+	          $$ = new special_constant(special_constant::T_BINARY, *$1);
+		  delete $1;
+	     }
+             | HEXADECIMAL
+	     {
+	          $$ = new special_constant(special_constant::T_HEXADECIMAL, *$1);
+		  delete $1;
+	     }
+             | STRING_LITERAL
+	     {
+	          $$ = new special_constant(special_constant::T_STRING_LITERAL, *$1);
+		  delete $1;
+	     }
+             ;
+
+
+attribute_value_seq: attribute_value_seq attribute_value
+		   {
+		     $$ = $1;
+		     $$->push_back($2);
+		   }
+                   |
+		   {
+		     $$ = new attribute_value_vector();
+		   } 
+                   ;
+
+
+sort_par_seq: sort_par_seq SYMBOL
+	    {
+	      $$ = $1;
+	      $$->push_back(sort_parameter(*$2));
+	      pars.push_back(sort_parameter(*$2));
+	      delete $2;
+ 	    }
+          | 
+	    {
+	      $$ = new sort_parameter_vector();
+	    }
+          ;
+
+sort_seq: sort_seq sort
+	{
+	  $$ = $1;
+	  $$->push_back(*$2);
+	  delete $2;  
+	}
+        |
+	{
+	  $$ = new sort_vector();
+	}	
+        ;
+
+sort_ne_seq: sort_seq sort
+       	   {
+	    $$ = $1;
+	    $$->push_back(*$2);
+	    delete $2;  
+	   }
+           ;
+
+sort: SYMBOL
+    {
+    sort_parameter_vector::reverse_iterator it, it_end;
+    for(it = pars.rbegin(), it_end = pars.rend(); it != it_end; ++it)
+    {
+      if(it->get_name() == *$1)
+        break;
+    }    
+
+    if(it != pars.rend())
+     {
+       $$ = new sort(yy_api->get_sort_factory()->
+                     create_sort(*it));
+     }
+     else
+     {
+       $$ = new sort(yy_api->get_sort_factory()->
+                     create_sort(sort_symbol(*$1)));
+     }
+     delete $1;
+    } 
+    | indexed_identifier
+    {
+      $$ = new sort(yy_api->get_sort_factory()->create_sort(sort_symbol(*$1)));
+      delete $1;
+    }
+    | '(' SYMBOL sort_ne_seq ')'
+    {
+      $$ = new sort(yy_api->get_sort_factory()->create_sort(sort_symbol(*$2), std::move(*$3)));
+      delete $2;
+      delete $3;
+    }
+    | '(' indexed_identifier sort_ne_seq ')'
+    {
+      $$ = new sort(yy_api->get_sort_factory()->create_sort(sort_symbol(*$2), std::move(*$3)));
+      delete $2;
+      delete $3;
+    }
+    ;
+
+indexed_identifier: '(' RW_UNDERSCORE SYMBOL numeral_ne_seq ')'
+	  {
+	    $$ = new identifier(*$3, std::move(*$4));
+	    delete $3;
+	    delete $4;
+	  }
+          ;
+
+identifier: SYMBOL
+	  {
+	     $$ = new identifier(*$1);
+	     delete $1;
+	  }
+	  | indexed_identifier
+	  {
+	     $$ = $1;
+	  }
+	  ;
+
+sort_symbol: identifier
+	   {
+	     $$ = new sort_symbol(*$1);
+	     delete $1;
+	   }
+	   ;
+function_symbol: identifier
+	       {
+	        $$ = new function_symbol(*$1);
+		delete $1;
+	       }       
+	       ;
+
+numeral_seq: numeral_seq NUMERAL
+	   {
+	     $$ = $1;
+	     $$->push_back(atoi($2->c_str()));
+	     delete $2;
+           }
+           |
+	   {
+	     $$ = new identifier::index_vector();
+	   }
+           ;
+
+numeral_ne_seq: numeral_seq NUMERAL
+	      {
+	       $$ = $1;
+	       $$->push_back(atoi($2->c_str()));
+	       delete $2;
+              }
+              ;
+
+sorted_var_seq: sorted_var_seq sorted_var
+	      {
+               $$ = $1;
+	       $$->push_back(*$2);
+	       vars.push_back(*$2);
+	       delete $2;
+              }	
+              | 
+	      {
+	       $$ = new sorted_variable_vector(0, dummy_var);
+	      }
+              ;
+
+sorted_var_ne_seq: sorted_var_seq sorted_var
+                 {
+                  $$ = $1;
+	          $$->push_back(*$2);
+		  vars.push_back(*$2);
+	          delete $2;
+                 }	
+                 ;
+
+sorted_var: '(' SYMBOL sort ')'
+	  {
+	    $$ = new sorted_variable(*$2, *$3);
+	    delete $2;
+	    delete $3;
+          }
+          ;
+
+term: spec_constant
+    {
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(*$1));
+      delete $1;
+    }
+    | SYMBOL
+    {
+    sorted_variable_vector::reverse_iterator it, it_end;
+    for(it = vars.rbegin(),
+        it_end = vars.rend(); it != it_end; ++it)
+    {
+      if(it->get_variable().get_name() == *$1)
+        break;
+    }    
+
+    if(it != vars.rend())
+     {
+       $$ = new expression(yy_api->get_expression_factory()->
+                           create_expression(it->get_variable(), it->get_sort()));
+     }
+     else
+     {
+       $$ = new expression(yy_api->get_expression_factory()->
+                           create_expression(function_symbol(*$1)));
+     }
+     delete $1;
+    }
+    | indexed_identifier
+    {
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$1)));
+      delete $1;      	      
+    }
+    | '(' RW_AS SYMBOL sort ')'
+    {
+       $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$3), *$4));
+       delete $3;
+       delete $4;      
+    }
+    | '(' RW_AS indexed_identifier sort ')'
+    {
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$3), *$4));      
+      delete $3;
+      delete $4;
+    }
+    | '(' SYMBOL term_ne_seq ')'
+    {
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$2), std::move(*$3)));
+      delete $2;
+      delete $3;
+    }
+    | '(' '(' RW_AS SYMBOL sort ')' term_ne_seq ')'
+    {
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$4), std::move(*$7), *$5));
+      delete $4;
+      delete $5;
+      delete $7;
+    }
+    | '(' indexed_identifier term_ne_seq ')'
+    {
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$2), std::move(*$3)));
+      delete $2;
+      delete $3;
+    }
+    | '(' '(' RW_AS indexed_identifier sort ')' term_ne_seq ')'
+    {
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$4), std::move(*$7), *$5));
+      delete $4;
+      delete $5;
+      delete $7;
+    }
+    | '(' RW_LET '(' var_binding_ne_seq ')' term ')'
+    {
+      std::size_t n = $4->size();
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(std::move(*$4), *$6));
+      vars.resize(vars.size() - n, dummy_var);
+      delete $4;
+      delete $6;
+    }
+    | '(' RW_FORALL '(' sorted_var_ne_seq ')' term ')'
+    {
+      std::size_t n = $4->size();
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(Q_FORALL, std::move(*$4), *$6));
+      vars.resize(vars.size() - n, dummy_var);
+      delete $4;
+      delete $6;
+    }
+    | '(' RW_EXISTS '(' sorted_var_ne_seq ')' term ')'   
+    {
+      std::size_t n = $4->size();
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(Q_EXISTS, std::move(*$4), *$6));
+      vars.resize(vars.size() - n, dummy_var);
+      delete $4;
+      delete $6;      
+    } 
+    | '(' RW_EXCLAMATION term attribute_ne_seq ')'
+    {
+      $$ = $3;
+      (*$$)->get_attributes() = std::move(*$4);
+      delete $4;
+      yy_api->check_label(*$$);
+    }
+    ;
+
+var_binding: '(' SYMBOL term ')'
+	   {
+	     $$ = new variable_binding(*$2, *$3);
+	     delete $2;
+	     delete $3;
+	   }
+           ;
+
+var_binding_seq: var_binding_seq var_binding
+	       {
+	         $$ = $1;
+		 $$->push_back(*$2);
+		 vars.push_back(sorted_variable($2->get_variable(), $2->get_expression()->get_sort()));
+		 delete $2;
+	       }
+               |
+	       {
+	         $$ = new variable_binding_vector();
+	       }
+               ;
+
+var_binding_ne_seq: var_binding_seq var_binding
+		 {
+	          $$ = $1;
+		  $$->push_back(*$2);
+        	  vars.push_back(sorted_variable($2->get_variable(), $2->get_expression()->get_sort()));
+		  delete $2;
+	         }    
+                 ;
+
+term_seq: term_seq term
+	{
+	  $$ = $1;
+	  $$->push_back(*$2);
+	  delete $2;
+	}
+        |
+	{
+	  $$ = new expression_vector();
+	}
+        ;
+
+term_ne_seq: term_seq term
+	   {
+	     $$ = $1;
+	     $$->push_back(*$2);
+	     delete $2;
+	   }
+           ;
+%%       

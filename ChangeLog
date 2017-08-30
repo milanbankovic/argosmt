@@ -1,0 +1,11 @@
+2017.07.16
+----------
+*) EUF backjump optimized and enhanced with disequality propagations
+*) Heuristics interface changed to be more flexible
+*) hash calculation code refactored
+
+2017.02.23
+----------
+*) some bugfixes
+*) changed versioning. Now each version of the solver is numbered
+   by the release date.

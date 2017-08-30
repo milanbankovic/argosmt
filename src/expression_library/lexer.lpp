@@ -1,0 +1,112 @@
+/****************************************************************************
+argosmt (an open source SMT solver)
+Copyright (C) 2010-2015 Milan Bankovic (milan@matf.bg.ac.rs)
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+***************************************************************************/
+
+%option noyywrap
+
+%{
+#include<iostream>
+
+#include "smtlib_api.hpp"
+#include "parser.hpp"
+
+/* Helper function that mimics behaviour of standard YY_INPUT macro */
+template <typename T>
+inline void read_to_buff(char * buf, T & result, unsigned max_size) 
+{ 
+  
+   int c = '*';
+   unsigned n; 
+   for ( n = 0; n < max_size && 
+   (c = yy_istream->get(), 
+   (!yy_istream->eof() && !yy_istream->fail())) && c != '\n'; ++n ) 
+      buf[n] = (char) c; 	
+   if ( c == '\n' ) 
+       buf[n++] = (char) c; 
+   if ( !yy_istream->eof() && yy_istream->fail() ) 
+   {
+   	std::cerr << "input in flex scanner failed";
+	exit(1);
+   }
+    result = n; 
+} 
+
+#define YY_INPUT(buf,result,max_size) (read_to_buff(buf, result, max_size))
+
+%}
+
+numeral     0|[1-9][0-9]*
+nd          [a-zA-Z~!@$%^&*_\-+=<>.?/]
+simple_sym  {nd}({nd}|[0-9])*
+quoted_sym  \|[^\\|]*\|
+keyword     :({nd}|[0-9])+
+
+%x COMMENT
+
+%%
+;                                   BEGIN(COMMENT);
+\(                                  return *yytext;
+\)                                  return *yytext;
+{numeral}                           yylval.str_attr = new std::string(yytext); return NUMERAL;
+{numeral}\.0*{numeral}              yylval.str_attr = new std::string(yytext); return DECIMAL;
+#x[0-9A-Fa-f]+                      yylval.str_attr = new std::string(yytext); return HEXADECIMAL;
+#b[01]+                             yylval.str_attr = new std::string(yytext); return BINARY;
+\"([^\"]|\\\")*\"                   yylval.str_attr = new std::string(yytext); return STRING_LITERAL;
+par                                 return RW_PAR;
+NUMERAL                             return RW_NUMERAL;
+DECIMAL                             return RW_DECIMAL;
+STRING                              return RW_STRING;
+_                                   return RW_UNDERSCORE;
+!                                   return RW_EXCLAMATION;
+as                                  return RW_AS;
+let                                 return RW_LET;
+forall                              return RW_FORALL;
+exists                              return RW_EXISTS;
+set-logic                           active_error = false; return RW_SET_LOGIC; 
+set-option                          active_error = false; return RW_SET_OPTION;
+set-info                            active_error = false; return RW_SET_INFO;
+declare-sort                        active_error = false; return RW_DECLARE_SORT;
+define-sort                         active_error = false; return RW_DEFINE_SORT;
+expand-sort                         active_error = false; return RW_EXPAND_SORT;
+declare-fun                         active_error = false; return RW_DECLARE_FUN;
+define-fun                          active_error = false; return RW_DEFINE_FUN;
+expand-term                         active_error = false; return RW_EXPAND_TERM;
+push                                active_error = false; return RW_PUSH;
+pop                                 active_error = false; return RW_POP;
+assert                              active_error = false; return RW_ASSERT;
+check-sat                           active_error = false; return RW_CHECK_SAT;
+get-sort                            active_error = false; return RW_GET_SORT;
+get-assertions                      active_error = false; return RW_GET_ASSERTIONS;
+get-proof                           active_error = false; return RW_GET_PROOF;
+get-unsat-core                      active_error = false; return RW_GET_UNSAT_CORE;
+get-value                           active_error = false; return RW_GET_VALUE;
+get-assignment                      active_error = false; return RW_GET_ASSIGNMENT;
+get-option                          active_error = false; return RW_GET_OPTION;
+get-info                            active_error = false; return RW_GET_INFO;
+exit                                active_error = false; return RW_EXIT;
+{simple_sym}|{quoted_sym}           yylval.str_attr = new std::string(yytext); return SYMBOL;
+
+
+{keyword}                           yylval.str_attr = new std::string(yytext); return KEYWORD;
+[ \t\n]  
+<COMMENT>.
+<COMMENT>\n                         BEGIN(INITIAL);
+%%
+
+
+
