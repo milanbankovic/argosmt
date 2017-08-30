@@ -1,0 +1,13 @@
+*.o
+*~
+*.a
+*.la
+*.so
+Makefile
+config.h
+config.log
+config.status
+stamp-h1
+*/**/.deps/
+argosmt
+argosmt_dimacs
