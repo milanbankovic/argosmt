@@ -552,10 +552,13 @@ void argosmt_solver_interface::cnf_transformation_rec(const expression & expr,
 	{
 	  // Bool case:
 	  // if C then A else B  <=> (C /\ A) \/ (~C /\ B) <=> s
-	  // ((~C \/ ~A) /\ (C \/ ~B)) \/ s   
-	  // ~s \/ (C /\ A) \/ (~C /\ B)
-	  // (~C \/ ~A \/ s) /\ (C \/ ~B \/ s) 
-	  // (~s \/ C \/ B) /\ (~s \/ A \/ ~C) /\ (~s \/ A \/ B)
+	  // ((~C \/ ~A) /\ (C \/ ~B)) \/ s    /\
+	  // ~s \/ (C /\ A) \/ (~C /\ B)   <=>
+	  // (~C \/ ~A \/ s) /\ (C \/ ~B \/ s)   /\
+	  // (~s \/ C \/ B) /\ (~s \/ A \/ ~C) /\ (~s \/ A \/ B) <=>
+	  // (~C \/ ~A \/ s) /\ (C \/ ~B \/ s)  /\
+	  // (~s \/ C \/ B) /\ (~s \/ A \/ ~C)
+	  // (the last clause ~s \/ A \/ B is the resolvent of previous two)
 
 	  name = get_unique_constant(cnf_prefix, _smt_lib_api->get_sort_factory()->BOOL_SORT());    
 	  expression not_name = negate_name(name);
@@ -590,17 +593,19 @@ void argosmt_solver_interface::cnf_transformation_rec(const expression & expr,
 	  cl->push_back(not_c);
 	  clauses.push_back(cl);
 
-	  cl = new clause();
-	  cl->push_back(not_name);
-	  cl->push_back(a);
-	  cl->push_back(b);
-	  clauses.push_back(cl);
+	  // this clause is the resolvent of the previous two
+	  //cl = new clause();
+	  //cl->push_back(not_name);
+	  //cl->push_back(a);
+	  //cl->push_back(b);
+	  //clauses.push_back(cl);
 	}
       else {
 	// Non-bool case:
 	// if C then A else B = s,  (C /\ s = A)  \/ (~C /\ s = B)
 	// C /\ sA \/ ~C /\ sB  <=> 
-	// C \/ sB /\ sA \/ ~C  /\  sA \/ sB
+	// C \/ sB /\ sA \/ ~C  /\  sA \/ sB <=>
+	// C \/ sB /\ sA \/ ~C  (sA \/ sB is the resolvent)
 	name = get_unique_constant(ite_prefix, expr->infer_sorts()->get_sort());
 	expression sA = _smt_lib_api->get_expression_factory()->create_expression(function_symbol::EQ, name, op_names[1]);
 	expression sB = _smt_lib_api->get_expression_factory()->create_expression(function_symbol::EQ, name, op_names[2]);
@@ -617,10 +622,11 @@ void argosmt_solver_interface::cnf_transformation_rec(const expression & expr,
 	cl->push_back(sA);
 	clauses.push_back(cl);
 
-	cl = new clause();
-	cl->push_back(sA);
-	cl->push_back(sB);
-	clauses.push_back(cl);
+	// sA \/ sB is the resolvent of previous two clauses
+	//cl = new clause();
+	//cl->push_back(sA);
+	//cl->push_back(sB);
+	//clauses.push_back(cl);
       }
     }
   else
