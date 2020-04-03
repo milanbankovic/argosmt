@@ -550,7 +550,7 @@ void argosmt_solver_interface::cnf_transformation_rec(const expression & expr,
     {
       if(expr->is_formula())
 	{
-	  // Bool case:
+	  /* Bool case:
 	  // if C then A else B  <=> (C /\ A) \/ (~C /\ B) <=> s
 	  // ((~C \/ ~A) /\ (C \/ ~B)) \/ s    /\
 	  // ~s \/ (C /\ A) \/ (~C /\ B)   <=>
@@ -559,7 +559,7 @@ void argosmt_solver_interface::cnf_transformation_rec(const expression & expr,
 	  // (~C \/ ~A \/ s) /\ (C \/ ~B \/ s)  /\
 	  // (~s \/ C \/ B) /\ (~s \/ A \/ ~C)
 	  // (the last clause ~s \/ A \/ B is the resolvent of previous two)
-
+	  */
 	  name = get_unique_constant(cnf_prefix, _smt_lib_api->get_sort_factory()->BOOL_SORT());    
 	  expression not_name = negate_name(name);
 	  const expression & c = op_names[0];
@@ -770,7 +770,8 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
   int upper_predefined_csp_bound = s_config.upper_predefined_csp_bound(k);
   
   /* Adding theories */
-  if(_smt_lib_api->get_logic_symbol() == "QF_UF")
+  symbol s = _smt_lib_api->get_logic_symbol();
+  if(s == "QF_UF")
     {
       local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
       local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
@@ -779,7 +780,7 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
       local_solver->add_theory(new bool_theory(*local_solver));
       local_solver->add_theory(new euf_theory(*local_solver));
     }
-  else if(_smt_lib_api->get_logic_symbol() == "QF_LRA")
+  else if(s == "QF_LRA")
     {
       local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
       local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
@@ -788,26 +789,7 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
       local_solver->add_theory(new bool_theory(*local_solver));
       local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, false, 0, randomize_simplex, simplex_shuffle_seed));
     }
-  else if(_smt_lib_api->get_logic_symbol() == "QF_UFLRA")
-    {
-      local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
-      local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
-      local_solver->set_restart_strategy(new conflict_counting_restart_strategy(*local_solver,100, 1.5));
-
-      local_solver->add_theory(new bool_theory(*local_solver));
-      local_solver->add_theory(new euf_theory(*local_solver));
-      local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, true, 0, randomize_simplex, simplex_shuffle_seed));
-    }
-  else if(_smt_lib_api->get_logic_symbol() == "QF_LIA")
-    {
-      local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
-      local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
-      local_solver->set_restart_strategy(new conflict_counting_restart_strategy(*local_solver,100, 1.5));
-
-      local_solver->add_theory(new bool_theory(*local_solver));
-      local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, false, 0, randomize_simplex, simplex_shuffle_seed));
-    }
-  else if(_smt_lib_api->get_logic_symbol() == "QF_UFLIA")
+  else if(s == "QF_UFLRA")
     {
       local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
       local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
@@ -817,7 +799,7 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
       local_solver->add_theory(new euf_theory(*local_solver));
       local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, true, 0, randomize_simplex, simplex_shuffle_seed));
     }
-  else if(_smt_lib_api->get_logic_symbol() == "QF_LIRA")
+  else if(s == "QF_LIA")
     {
       local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
       local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
@@ -826,7 +808,7 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
       local_solver->add_theory(new bool_theory(*local_solver));
       local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, false, 0, randomize_simplex, simplex_shuffle_seed));
     }
-  else if(_smt_lib_api->get_logic_symbol() == "QF_UFLIRA")
+  else if(s == "QF_UFLIA")
     {
       local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
       local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
@@ -836,7 +818,7 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
       local_solver->add_theory(new euf_theory(*local_solver));
       local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, true, 0, randomize_simplex, simplex_shuffle_seed));
     }
-  else if(_smt_lib_api->get_logic_symbol() == "QF_RDL")
+  else if(s == "QF_LIRA")
     {
       local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
       local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
@@ -845,7 +827,17 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
       local_solver->add_theory(new bool_theory(*local_solver));
       local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, false, 0, randomize_simplex, simplex_shuffle_seed));
     }
-  else if(_smt_lib_api->get_logic_symbol() == "QF_IDL")
+  else if(s == "QF_UFLIRA" || s == "ALL")
+    {
+      local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
+      local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
+      local_solver->set_restart_strategy(new conflict_counting_restart_strategy(*local_solver,100, 1.5));
+
+      local_solver->add_theory(new bool_theory(*local_solver));
+      local_solver->add_theory(new euf_theory(*local_solver));
+      local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, true, 0, randomize_simplex, simplex_shuffle_seed));
+    }
+  else if(s == "QF_RDL")
     {
       local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
       local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
@@ -854,7 +846,16 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
       local_solver->add_theory(new bool_theory(*local_solver));
       local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, false, 0, randomize_simplex, simplex_shuffle_seed));
     }
-  else if(_smt_lib_api->get_logic_symbol() == "QF_CSP")
+  else if(s == "QF_IDL")
+    {
+      local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver));
+      local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
+      local_solver->set_restart_strategy(new conflict_counting_restart_strategy(*local_solver,100, 1.5));
+
+      local_solver->add_theory(new bool_theory(*local_solver));
+      local_solver->add_theory(new arithmetic_theory(*local_solver, buss, nbuss, 13, false, 0, randomize_simplex, simplex_shuffle_seed));
+    }
+  else if(s == "QF_CSP")
     {
       //local_solver->set_forget_strategy(new geometric_forget_strategy(*local_solver, 1000U, 1.1));
       //local_solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*local_solver));
@@ -878,13 +879,13 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
       delete local_solver;
       throw command_unsupported_exception();
     }
-  
+
   check_sat_response csr = local_solver->solve();
 
-  if(_smt_lib_api->get_info(keyword(":status")))
+  if(_smt_lib_api->get_info(keyword::STATUS))
     {
       check_sat_response known_csr; 
-      _smt_lib_api->get_info(keyword(":status"), known_csr);
+      _smt_lib_api->get_info(keyword::STATUS, known_csr);
       if(known_csr != CSR_UNKNOWN && csr != CSR_UNKNOWN && known_csr != csr)
 	{
 	  std::cerr << "ERROR FATAL!! WRONG ANSWER!!" << std::endl;
@@ -1009,7 +1010,7 @@ check_sat_response argosmt_solver_interface::check_sat()
   double elapsed = _cl.seconds_elapsed();
     
   attr.insert(attribute(":solving-time", elapsed));
-  _smt_lib_api->set_info(keyword(":all-statistics"), attr);
+  _smt_lib_api->set_info(keyword::ALL_STATISTICS, attr);
   _smt_lib_api->pop();
   return csr;
 }

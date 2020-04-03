@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef _PARALLEL_PORTFOLIO
 bool solving_cancelled = false;
 
+
 void solver::check_and_export_shared_clause(clause * cl)
 {
   if(cl->size() <= _share_size_limit && (_learnt_clauses.size() < 2 || *cl != *_learnt_clauses[_learnt_clauses.size() - 2]))

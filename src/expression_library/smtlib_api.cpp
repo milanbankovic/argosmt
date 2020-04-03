@@ -29,8 +29,13 @@ smtlib_api::smtlib_api()
    _options(HASH_TABLE_SIZE),
    _cout(0),
    _cerr(0),
-   _response(CSR_UNKNOWN)
+   _infos(HASH_TABLE_SIZE),
+   _response(CSR_UNKNOWN),
+   _expected_response(CSR_UNKNOWN)
 {
+
+  register_logic("ALL", new qfuflira_logic_declaration());
+  
   register_logic("AUFLIA", new auflia_logic_declaration());
   register_logic("AUFLIRA", new auflira_logic_declaration());
   register_logic("AUFNIRA", new aufnira_logic_declaration());
@@ -62,11 +67,12 @@ smtlib_api::smtlib_api()
 
   set_option(keyword::PRINT_SUCCESS, true);
   set_option(keyword::EXPAND_DEFINITIONS, false);
-  set_option(keyword::INTERACTIVE_MODE, false);
+  set_option(keyword::PRODUCE_ASSERTIONS, false);
   set_option(keyword::PRODUCE_PROOFS, false);
   set_option(keyword::PRODUCE_UNSAT_CORES, false);
   set_option(keyword::PRODUCE_MODELS, false);
   set_option(keyword::PRODUCE_ASSIGNMENTS, false);
+  set_option(keyword::GLOBAL_DECLARATIONS, false);
   set_option(keyword::SYNTAX_CHECKING, true);
   set_option(keyword::LOGIC_SYNTAX_CHECKING, true);
   set_option(keyword::REGULAR_OUTPUT_CHANNEL, std::string("stdout"));
@@ -81,6 +87,27 @@ smtlib_api::smtlib_api()
 
 void smtlib_api::set_logic(const symbol & name)
 {
+  _solver_interface->reset_interface();
+  
+  _assertions.clear();
+  _assertion_levels.clear();
+
+  _all_labels.clear();
+  _all_labels_levels.clear();
+  
+  _assertion_labels.clear();
+  _assertion_labels_levels.clear();
+
+  delete _exp_factory;
+  delete _signature;
+
+  _expansion_signatures.clear();
+
+  _response = CSR_UNKNOWN;
+  _expected_response = CSR_UNKNOWN;
+
+  set_info(keyword::STATUS, CSR_UNKNOWN);
+  
   logics_map::iterator it = _map.find(name);
   if(it == _map.end())
     throw bad_logic_exception("set-logic", name);
@@ -90,25 +117,14 @@ void smtlib_api::set_logic(const symbol & name)
       _logic_symbol = name;
     }
 
-  _assertions.clear();
-  _assertion_levels.clear();
   _assertion_levels.push_back(0);
-  
-  _all_labels.clear();
-  _all_labels_levels.clear();
   _all_labels_levels.push_back(0);
-  
-  _assertion_labels.clear();
-  _assertion_labels_levels.clear();
   _assertion_labels_levels.push_back(0);
  
-  delete _exp_factory;
-  delete _signature;
   if(!_syntax_checking)
     cerr() << "warning!! :syntax-checking is set to false" << std::endl;
   _signature = _logic->create_signature(_syntax_checking);
   _exp_factory = new expression_factory(_signature);
-  _expansion_signatures.clear();
   signature * new_expansion = 
     new signature(signature::T_EXPANSION_SIGNATURE, _signature);
   _expansion_signatures.push_back(new_expansion);
@@ -270,8 +286,19 @@ void smtlib_api::set_option(const attribute & attr)
     }
   else if(option == keyword::INTERACTIVE_MODE)
     {
-      if(!set_bool_value(_options, attr, _interactive_mode))
-	throw command_error_exception("set-option: :interactive-mode option "
+      
+      if(!set_bool_value(_options,
+			 attribute(keyword::PRODUCE_ASSERTIONS,
+				   attr.get_value()->clone()),
+			 _produce_assertions))
+	throw command_error_exception("set-option: :produce-assertions "
+				      "(a.k.a. :interactive-mode) option "
+				      "should have a boolean value");
+    }
+  else if(option == keyword::PRODUCE_ASSERTIONS)
+    {
+      if(!set_bool_value(_options, attr, _produce_assertions))
+	throw command_error_exception("set-option: :produce-assertions option "
 				      "should have a boolean value");
     }
   else if(option == keyword::PRODUCE_PROOFS)
@@ -296,6 +323,12 @@ void smtlib_api::set_option(const attribute & attr)
     {
       if(!set_bool_value(_options, attr, _produce_assignments))
 	throw command_error_exception("set-option: :produce-assignments option "
+				      "should have a boolean value");
+    }
+  else if(option == keyword::GLOBAL_DECLARATIONS)
+    {
+      if(!set_bool_value(_options, attr, _global_declarations))
+	throw command_error_exception("set-option: :global-declarations option "
 				      "should have a boolean value");
     }
   else if(option == keyword::SYNTAX_CHECKING)
@@ -492,7 +525,7 @@ bool set_csr_value(attribute_set & options,
 void smtlib_api::set_info(const attribute & attr)
 {
   const keyword & info = attr.get_keyword();
-
+  
   if(info == keyword::ERROR_BEHAVIOR)
     {
       if(!set_eb_value(_infos, attr, _error_behavior))
@@ -509,7 +542,7 @@ void smtlib_api::set_info(const attribute & attr)
     }
   else if(info == keyword::STATUS)
     {
-      if(!set_csr_value(_infos, attr, _response))
+      if(!set_csr_value(_infos, attr, _expected_response))
 	throw command_error_exception
 	  ("set-info: :status info should have value sat, unsat or unknown");
     }
@@ -609,8 +642,11 @@ define_function(const function_symbol & sm,
   
   attribute_set attr(HASH_TABLE_SIZE);
   attr.insert(attribute(keyword::DEFINITION, function_definition(std::move(vars), exp)));
-  
-  _expansion_signatures.back()->add_function_symbol(sm, std::move(rn), std::move(attr));  
+
+  if(_global_declarations)
+    _expansion_signatures[0]->add_function_symbol(sm, std::move(rn), std::move(attr));
+  else
+    _expansion_signatures.back()->add_function_symbol(sm, std::move(rn), std::move(attr));  
 }
 
 
@@ -724,6 +760,87 @@ void smtlib_api::assert_expression(const expression & exp)
     }
 }
 
+
+void smtlib_api::reset_assertions()
+{
+  unsigned n = _assertion_levels.size();
+  _assertions.clear();
+  _assertion_levels.clear();
+  _assertion_levels.push_back(0);
+  
+  _all_labels.clear();
+  _all_labels_levels.clear();
+  _all_labels_levels.push_back(0);
+  
+  _assertion_labels.clear();
+  _assertion_labels_levels.clear();
+  _assertion_labels_levels.push_back(0);
+
+
+  while(--n)
+    {
+      delete _expansion_signatures.back();
+      _expansion_signatures.pop_back();
+      assert(_expansion_signatures.back()->get_expansion_signature() == 0);
+    }
+  
+  if(!_global_declarations)
+    {
+      delete _expansion_signatures.back();
+      _expansion_signatures.pop_back();
+      signature * new_expansion = 
+	new signature(signature::T_EXPANSION_SIGNATURE, _signature);
+      _expansion_signatures.push_back(new_expansion);
+    }
+}
+
+void smtlib_api::reset()
+{
+  _solver_interface->reset_interface();
+  
+  _assertions.clear();
+  _assertion_levels.clear();
+
+  _all_labels.clear();
+  _all_labels_levels.clear();
+  
+  _assertion_labels.clear();
+  _assertion_labels_levels.clear();
+
+  delete _exp_factory;
+  delete _signature;
+
+  _exp_factory = nullptr;
+  _signature = nullptr;
+  _logic = nullptr;
+  _expansion_signatures.clear();
+  _logic_symbol = symbol("");
+  _response = CSR_UNKNOWN;
+  _expected_response = CSR_UNKNOWN;
+
+  _options.clear();
+  set_option(keyword::PRINT_SUCCESS, true);
+  set_option(keyword::EXPAND_DEFINITIONS, false);
+  set_option(keyword::PRODUCE_ASSERTIONS, false);
+  set_option(keyword::PRODUCE_PROOFS, false);
+  set_option(keyword::PRODUCE_UNSAT_CORES, false);
+  set_option(keyword::PRODUCE_MODELS, false);
+  set_option(keyword::PRODUCE_ASSIGNMENTS, false);
+  set_option(keyword::GLOBAL_DECLARATIONS, false);
+  set_option(keyword::SYNTAX_CHECKING, true);
+  set_option(keyword::LOGIC_SYNTAX_CHECKING, true);
+  set_option(keyword::REGULAR_OUTPUT_CHANNEL, std::string("stdout"));
+  set_option(keyword::DIAGNOSTIC_OUTPUT_CHANNEL, std::string("stderr"));
+  set_option(keyword::RANDOM_SEED, 0UL);
+  set_option(keyword::VERBOSITY, 0UL);
+
+  _infos.clear();
+  set_info(keyword::ERROR_BEHAVIOR, EB_IMMEDIATE_EXIT);
+  set_info(keyword::REASON_UNKNOWN, RU_NOT_UNKNOWN);
+  set_info(keyword::STATUS, CSR_UNKNOWN);
+
+  _solver_interface->init_interface();
+}
 
 void smtlib_api::parse_input(std::istream & istr)
 {

@@ -111,9 +111,9 @@ private:
 
 public:
   argosmt_solver_interface(unsigned numofsolvers = 1)
-    :_solvers(numofsolvers, (solver*)0),
-     _statistics_observers(numofsolvers, (statistics_solver_observer*)0),
-     _solver(0),
+    :_solvers(numofsolvers, nullptr),
+     _statistics_observers(numofsolvers, nullptr),
+     _solver(nullptr),
      _instance_index(0)
   {}
 
@@ -129,6 +129,16 @@ public:
     _smt_lib_api->set_option(keyword(":print-success"), false);
   }
 
+  virtual void reset_interface()
+  {
+    _statistics_observers.assign(_statistics_observers.size(), nullptr);
+    for(solver * sl : _solvers)
+      delete sl; 
+    _solvers.assign(_solvers.size(), nullptr);
+    _solver = nullptr;
+    _instance_index = 0;
+  }
+  
   virtual check_sat_response check_sat();  
 
   virtual expression_vector get_value(const expression_vector & exps);
@@ -150,7 +160,13 @@ public:
 
   void print_reports(std::ostream & ostr)
   {
-    _solver->print_reports(ostr);
+    if(_solver != nullptr)
+      _solver->print_reports(ostr);
+  }
+
+  virtual ~argosmt_solver_interface()
+  {
+    reset_interface();
   }
 };
 

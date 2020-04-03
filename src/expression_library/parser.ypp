@@ -63,6 +63,7 @@ sorted_variable dummy_var("", sort());
 %token RW_DECLARE_SORT;
 %token RW_DEFINE_SORT;
 %token RW_EXPAND_SORT;
+%token RW_DECLARE_CONST;
 %token RW_DECLARE_FUN;
 %token RW_DEFINE_FUN;
 %token RW_EXPAND_TERM;
@@ -78,6 +79,9 @@ sorted_variable dummy_var("", sort());
 %token RW_GET_ASSIGNMENT;
 %token RW_GET_OPTION;
 %token RW_GET_INFO;
+%token RW_RESET_ASSERTIONS;
+%token RW_RESET;
+%token RW_ECHO;
 %token RW_EXIT;
 %token<str_attr> SYMBOL;
 %token<str_attr> KEYWORD;
@@ -97,8 +101,8 @@ sorted_variable dummy_var("", sort());
 %type<id_attr> identifier
 %type<ss_attr> sort_symbol
 %type<fs_attr> function_symbol
-%type<num_v_attr> numeral_seq
-%type<num_v_attr> numeral_ne_seq
+%type<index_v_attr> index_seq
+%type<index_v_attr> index_ne_seq
 %type<sort_var_v_attr> sorted_var_seq
 %type<sort_var_v_attr> sorted_var_ne_seq
 %type<sort_var_attr> sorted_var
@@ -122,7 +126,7 @@ sorted_variable dummy_var("", sort());
       identifier * id_attr;
       sort_symbol * ss_attr;
       function_symbol * fs_attr;
-      identifier::index_vector * num_v_attr;      
+      identifier::index_vector * index_v_attr;      
       sorted_variable_vector * sort_var_v_attr;
       sorted_variable * sort_var_attr;
       expression * term_attr;
@@ -186,6 +190,20 @@ command : '(' RW_SET_LOGIC SYMBOL ')'
 	{
 	  yy_api->cout() << yy_api->expand_sort(*$3) << std::endl;
 	  delete $3;
+	}
+	| '(' RW_ECHO STRING_LITERAL ')'
+	{
+	   yy_api->echo(*$3);
+	   delete $3;
+	}
+	| '(' RW_DECLARE_CONST function_symbol sort ')'
+	{
+	  yy_api->declare_const(*$3, *$4);
+	  if(yy_api->print_success())
+	    yy_api->cout() << "success" << std::endl;
+	  delete $3;
+	  delete $4;
+
 	}
         | '(' RW_DECLARE_FUN function_symbol '(' sort_seq ')' sort ')'
 	{
@@ -257,10 +275,8 @@ command : '(' RW_SET_LOGIC SYMBOL ')'
 	}
         | '(' RW_CHECK_SAT ')'
 	{
-	
-	yy_api->check_sat();
-	yy_api->get_info(keyword::STATUS)->print_value(yy_api->cout());
-	yy_api->cout() << std::endl;	
+	  check_sat_response csr = yy_api->check_sat();
+	  yy_api->cout() << csr << std::endl;
 	}
         | '(' RW_GET_ASSERTIONS ')'
 	{
@@ -275,6 +291,14 @@ command : '(' RW_SET_LOGIC SYMBOL ')'
                yy_api->cout() << *it << " "; 
           }
 	yy_api->cout() << ")" << std::endl;
+	}
+	| '(' RW_RESET_ASSERTIONS ')'
+	{
+	  yy_api->reset_assertions();
+	}
+	| '(' RW_RESET ')'
+	{
+	  yy_api->reset();
 	}
         | '(' RW_GET_PROOF ')'
 	{
@@ -412,27 +436,27 @@ attribute_ne_seq: attribute_seq attribute
 
 spec_constant: NUMERAL 
 	       {
-	          $$ = new special_constant(special_constant::T_NUMERAL, *$1);
+	          $$ = new special_constant(special_constant::T_NUMERAL, std::move(*$1));
 		  delete $1;
 	       }
              | DECIMAL
 	     {
-	          $$ = new special_constant(special_constant::T_DECIMAL, *$1);
+	          $$ = new special_constant(special_constant::T_DECIMAL, std::move(*$1));
 		  delete $1;
 	     }
              | BINARY
              {
-	          $$ = new special_constant(special_constant::T_BINARY, *$1);
+	          $$ = new special_constant(special_constant::T_BINARY, std::move(*$1));
 		  delete $1;
 	     }
              | HEXADECIMAL
 	     {
-	          $$ = new special_constant(special_constant::T_HEXADECIMAL, *$1);
+	          $$ = new special_constant(special_constant::T_HEXADECIMAL, std::move(*$1));
 		  delete $1;
 	     }
              | STRING_LITERAL
 	     {
-	          $$ = new special_constant(special_constant::T_STRING_LITERAL, *$1);
+	          $$ = new special_constant(special_constant::T_STRING_LITERAL, std::move(*$1));
 		  delete $1;
 	     }
              ;
@@ -453,8 +477,8 @@ attribute_value_seq: attribute_value_seq attribute_value
 sort_par_seq: sort_par_seq SYMBOL
 	    {
 	      $$ = $1;
-	      $$->push_back(sort_parameter(*$2));
-	      pars.push_back(sort_parameter(*$2));
+	      $$->push_back(sort_parameter(std::move(*$2)));
+	      pars.push_back(sort_parameter(std::move(*$2)));
 	      delete $2;
  	    }
           | 
@@ -500,13 +524,13 @@ sort: SYMBOL
      else
      {
        $$ = new sort(yy_api->get_sort_factory()->
-                     create_sort(sort_symbol(*$1)));
+                     create_sort(sort_symbol(std::move(*$1))));
      }
      delete $1;
     } 
     | indexed_identifier
     {
-      $$ = new sort(yy_api->get_sort_factory()->create_sort(sort_symbol(*$1)));
+      $$ = new sort(yy_api->get_sort_factory()->create_sort(sort_symbol(std::move(*$1))));
       delete $1;
     }
     | '(' SYMBOL sort_ne_seq ')'
@@ -523,9 +547,9 @@ sort: SYMBOL
     }
     ;
 
-indexed_identifier: '(' RW_UNDERSCORE SYMBOL numeral_ne_seq ')'
+indexed_identifier: '(' RW_UNDERSCORE SYMBOL index_ne_seq ')'
 	  {
-	    $$ = new identifier(*$3, std::move(*$4));
+	    $$ = new identifier(std::move(*$3), std::move(*$4));
 	    delete $3;
 	    delete $4;
 	  }
@@ -533,7 +557,7 @@ indexed_identifier: '(' RW_UNDERSCORE SYMBOL numeral_ne_seq ')'
 
 identifier: SYMBOL
 	  {
-	     $$ = new identifier(*$1);
+	     $$ = new identifier(std::move(*$1));
 	     delete $1;
 	  }
 	  | indexed_identifier
@@ -544,35 +568,47 @@ identifier: SYMBOL
 
 sort_symbol: identifier
 	   {
-	     $$ = new sort_symbol(*$1);
+	     $$ = new sort_symbol(std::move(*$1));
 	     delete $1;
 	   }
 	   ;
 function_symbol: identifier
 	       {
-	        $$ = new function_symbol(*$1);
+	        $$ = new function_symbol(std::move(*$1));
 		delete $1;
 	       }       
 	       ;
 
-numeral_seq: numeral_seq NUMERAL
+index_seq: index_seq NUMERAL
 	   {
 	     $$ = $1;
 	     $$->push_back(atoi($2->c_str()));
 	     delete $2;
            }
-           |
+	   | index_seq SYMBOL
+	   {
+	     $$ = $1;
+	     $$->push_back(symbol(std::move(*$2)));
+	     delete $2;
+	   }
+           |	   
 	   {
 	     $$ = new identifier::index_vector();
 	   }
            ;
 
-numeral_ne_seq: numeral_seq NUMERAL
+index_ne_seq: index_seq NUMERAL
 	      {
 	       $$ = $1;
 	       $$->push_back(atoi($2->c_str()));
 	       delete $2;
               }
+	      | index_seq SYMBOL
+	      {
+	        $$ = $1;
+	        $$->push_back(symbol(std::move(*$2)));
+	        delete $2;
+	      }
               ;
 
 sorted_var_seq: sorted_var_seq sorted_var
@@ -599,7 +635,7 @@ sorted_var_ne_seq: sorted_var_seq sorted_var
 
 sorted_var: '(' SYMBOL sort ')'
 	  {
-	    $$ = new sorted_variable(*$2, *$3);
+	    $$ = new sorted_variable(std::move(*$2), *$3);
 	    delete $2;
 	    delete $3;
           }
@@ -628,49 +664,49 @@ term: spec_constant
      else
      {
        $$ = new expression(yy_api->get_expression_factory()->
-                           create_expression(function_symbol(*$1)));
+                           create_expression(function_symbol(std::move(*$1))));
      }
      delete $1;
     }
     | indexed_identifier
     {
-      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$1)));
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(std::move(*$1))));
       delete $1;      	      
     }
     | '(' RW_AS SYMBOL sort ')'
     {
-       $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$3), *$4));
+       $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(std::move(*$3)), *$4));
        delete $3;
        delete $4;      
     }
     | '(' RW_AS indexed_identifier sort ')'
     {
-      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$3), *$4));      
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(std::move(*$3)), *$4));      
       delete $3;
       delete $4;
     }
     | '(' SYMBOL term_ne_seq ')'
     {
-      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$2), std::move(*$3)));
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(std::move(*$2)), std::move(*$3)));
       delete $2;
       delete $3;
     }
     | '(' '(' RW_AS SYMBOL sort ')' term_ne_seq ')'
     {
-      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$4), std::move(*$7), *$5));
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(std::move(*$4)), std::move(*$7), *$5));
       delete $4;
       delete $5;
       delete $7;
     }
     | '(' indexed_identifier term_ne_seq ')'
     {
-      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$2), std::move(*$3)));
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(std::move(*$2)), std::move(*$3)));
       delete $2;
       delete $3;
     }
     | '(' '(' RW_AS indexed_identifier sort ')' term_ne_seq ')'
     {
-      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(*$4), std::move(*$7), *$5));
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(function_symbol(std::move(*$4)), std::move(*$7), *$5));
       delete $4;
       delete $5;
       delete $7;
@@ -710,7 +746,7 @@ term: spec_constant
 
 var_binding: '(' SYMBOL term ')'
 	   {
-	     $$ = new variable_binding(*$2, *$3);
+	     $$ = new variable_binding(std::move(*$2), *$3);
 	     delete $2;
 	     delete $3;
 	   }

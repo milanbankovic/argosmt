@@ -133,6 +133,8 @@ void cmd_line_parser::parse_cmd_line(int argc, char ** argv)
 	      print_usage_message(argv[0]);
 	      exit(1);
 	    }
-	}
+	}      
     }
+  if(_input == &std::cin)
+    std::cin.sync_with_stdio(false);
 }

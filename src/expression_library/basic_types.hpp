@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "common.hpp"
 #include "object_factory.hpp"
+#include "vector_hash_code.hpp"
 
 #ifdef _USE_GMP
 #include <gmpxx.h>
@@ -434,10 +435,13 @@ public:
 };
   
 
+class identifier;
+
 /** Represents symbol lexical category. It serves as a base
     class for classes Variable and SortParameter. Internally, it is
     represented as string. */
 class symbol {
+  friend class identifier;
 protected:
   struct data : public std::enable_shared_from_this<data> {
     std::string _name;
@@ -474,8 +478,12 @@ protected:
   }
 
   std::shared_ptr<const data> _data;
-    
+
+  /** Constructor that creates uninitialized symbol */
+  symbol();    
+  
 public:
+  
   /** Constructor that initializes the symbol with the given string. */
   symbol(const std::string & name);
 
@@ -511,8 +519,6 @@ public:
   std::string to_string() const;
 };
   
-
-
 
 namespace std {
     template<>
@@ -608,6 +614,9 @@ public:
   /** :interactive-mode keyword. */
   static const keyword INTERACTIVE_MODE;
 
+  /** :produce-assertions keyword */
+  static const keyword PRODUCE_ASSERTIONS;
+  
   /** :produce-proofs keyword. */
   static const keyword PRODUCE_PROOFS;
 
@@ -620,6 +629,9 @@ public:
   /** :produce-assignments keyword. */
   static const keyword PRODUCE_ASSIGNMENTS;
 
+  /** :global-declarations keyword */
+  static const keyword GLOBAL_DECLARATIONS;
+  
   /** :syntax-checking keyword. */
   static const keyword SYNTAX_CHECKING;
 
@@ -703,12 +715,143 @@ std::ostream & operator << (std::ostream & ostr, const keyword & k);
     a vector of unsigned numbers. */
 class identifier {
 public:
+
+  class index {
+  public:
+    enum type { UNSIGNED = 0, SYMBOL = 1, UNSPECIFIED = 2 } ;
+  private:
+    type _tp;
+    unsigned _u_val;
+    symbol _s_val;
+    std::size_t _hash_code;
+
+    void calculate_hash() 
+    {
+      _hash_code = _tp == UNSIGNED ? std::hash<unsigned>()(_u_val) :
+	(_tp == SYMBOL ? _s_val.hash_code() : 0); 
+    }
     
+  public:
+    index(unsigned u_val)
+      :_tp(UNSIGNED),
+       _u_val(u_val),
+       _s_val()
+    {
+      calculate_hash();
+    }
+    
+    index(const symbol & s)
+      :_tp(SYMBOL),
+       _u_val((unsigned)(-1)),
+       _s_val(s)
+    {
+      calculate_hash();
+    }
+    
+    index(symbol && s)
+      :_tp(SYMBOL),
+       _u_val((unsigned)(-1)),
+       _s_val(std::move(s))
+    {
+      calculate_hash();
+    }
+
+
+    index()
+      :_tp(UNSPECIFIED),
+       _u_val((unsigned)(-1)),
+       _s_val()
+    {
+      calculate_hash();
+    }
+
+
+    type get_type() const
+    {
+      return _tp;
+    }
+    
+    bool is_unsigned() const
+    {
+      return _tp == UNSIGNED;
+    }
+
+    bool is_symbol() const
+    {
+      return _tp == SYMBOL;
+    }
+
+    bool is_unspecified() const
+    {
+      return _tp == UNSPECIFIED;
+    }
+    
+    unsigned get_unsigned_value() const; // defined below
+
+    const symbol & get_symbol_value() const; // defined below
+
+    bool operator == (const index & ind) const
+    {
+      return _tp == ind._tp && _u_val == ind._u_val && _s_val == ind._s_val;
+    }
+
+    bool operator != (const index & ind) const
+    {
+      return !(*this == ind);
+    }
+
+    bool operator < (const index & ind) const
+    {
+      return _tp < ind._tp ||
+		   (_tp == UNSIGNED && ind._tp == UNSIGNED && _u_val < ind._u_val) ||
+	(_tp == SYMBOL && ind._tp == SYMBOL && _s_val < ind._s_val);
+    }
+
+    bool operator <= (const index & ind) const
+    {
+      return _tp < ind._tp ||
+		   (_tp == UNSIGNED && ind._tp == UNSIGNED && _u_val <= ind._u_val) ||
+	(_tp == SYMBOL && ind._tp == SYMBOL && _s_val <= ind._s_val) ||
+	(_tp == UNSPECIFIED && ind._tp == UNSPECIFIED);
+    }
+
+    bool operator > (const index & ind) const
+    {
+      return ind < *this;
+    }
+
+    bool operator >= (const index & ind) const
+    {
+      return ind <= *this;
+    }
+
+    void out(std::ostream & ostr) const
+    {
+      if(_tp == UNSIGNED)
+	ostr << _u_val;
+      else if(_tp == SYMBOL)
+	ostr << _s_val;
+      else
+	ostr << "*";
+    }
+
+    std::size_t hash_code() const
+    {
+      return _hash_code;
+    }
+
+    std::string to_string() const
+    {
+      return ::to_string(this);
+    }
+    
+  };
+  
   /** Type representing vector of indices. */
-  typedef std::vector<unsigned> index_vector; 
+  typedef std::vector<index> index_vector; 
     
-  /** Unspecified index is defined as (unsigned)(-1). */
-  static const unsigned UNSPECIFIED_INDEX;
+  /** Unspecified index */
+  static const index UNSPECIFIED_INDEX;
     
   /** Empty vector of indices (for those identifiers that are not indexed). */
   static const index_vector EMPTY_INDEX_VECTOR;
@@ -754,6 +897,8 @@ private:
     void calculate_hash()
     {
       _hash_code = std::hash<std::string>() (_name);
+      if(!_indices->empty())
+	_hash_code += vector_hash_code<index>() (*_indices);
     }
 
     void out(std::ostream & ostr) const
@@ -795,22 +940,6 @@ public:
       with a vector of indices. */
   identifier(const std::string & name, index_vector && indices);
 
-  /** Constructor that initializes the indexed identifier with a given 
-      string and with one given index. */
-  identifier(const std::string & name, unsigned index);
-
-  /** Constructor that initializes the indexed identifier with a given 
-      string and with one given index. */
-  identifier(std::string && name, unsigned index);
-
-  /** Constructor that initializes the indexed identifier with a given 
-      string and with two given indices. */
-  identifier(const std::string & name, unsigned index1, unsigned index2);
-
-  /** Constructor that initializes the indexed identifier with a given 
-      string and with two given indices. */
-  identifier(std::string && name, unsigned index1, unsigned index2);
-
   /** Constructor that initializes the identifier with a given string, and,
       optionally, with a vector of indices. */
   identifier(const char * name, const index_vector & indices = EMPTY_INDEX_VECTOR);
@@ -818,14 +947,6 @@ public:
   /** Constructor that initializes the identifier with a given string, and,
       optionally, with a vector of indices. */
   identifier(const char * name, index_vector && indices);
-
-  /** Constructor that initializes the indexed identifier with a given 
-      string and with one given index. */
-  identifier(const char * name, unsigned index);
-    
-  /** Constructor that initializes the indexed identifier with a given 
-      string and with two given indices. */
-  identifier(const char * name, unsigned index1, unsigned index2);
     
   /** Gets the name of the identifier. */
   const std::string & get_name() const;
@@ -880,6 +1001,69 @@ public:
   void out(std::ostream & ostr) const;
   std::string to_string() const;
 };
+
+
+inline
+std::string to_string(identifier::index::type tp)
+{
+  switch(tp)
+    {
+    case identifier::index::UNSIGNED:
+      return std::string("UNSIGNED");
+      break;
+    case identifier::index::SYMBOL:
+      return std::string("SYMBOL");
+      break;
+    case identifier::index::UNSPECIFIED:
+      return std::string("UNSPECIFIED");
+      break;
+    default:
+      return std::string("UNDEF");
+      break;
+    }  
+}
+
+
+/** Type of the exception thrown when an indefier index is of one type, 
+    and the user requests the value of another type. */
+class bad_index_type_exception : public base_exception {
+private:
+  identifier::index _index; 
+public:
+  /** Constructor. */
+  bad_index_type_exception(const std::string & message,
+			   const identifier::index & ind)
+    :base_exception(message + std::string(": bad index type: ") +
+		    ind.to_string() + " of type: " + 
+		    to_string(ind.get_type()) + 
+		    std::string(" (different type of value requested)")),
+     _index(ind)
+  {}
+
+  /** Gets index. */
+  const identifier::index & get_index() const
+  {
+    return _index;
+  }
+};
+
+inline
+unsigned identifier::index::get_unsigned_value() const
+{
+  if(_tp != UNSIGNED)
+    throw bad_index_type_exception("Index is not of appropriate type", *this);
+  return _u_val;
+}
+
+inline
+const symbol & identifier::index::get_symbol_value() const
+{
+  if(_tp != SYMBOL)
+    throw bad_index_type_exception("Index is not of appropriate type", *this);
+  return _s_val;
+}
+
+
 
 namespace std {
     template<>
@@ -1701,6 +1885,12 @@ std::ostream & operator << (std::ostream & ostr,
   return ostr;
 }
 
+
+inline
+symbol::symbol()
+  : _data(0)
+{}
+
 inline
 symbol::symbol(const std::string & name)
   : symbol(std::string(name))
@@ -1902,25 +2092,6 @@ identifier::identifier(const std::string & name, index_vector && indices)
   : identifier(std::string(name), std::move(indices))
 {}
 
-inline
-identifier::identifier(const std::string & name, unsigned index)
-  : identifier(std::string(name), index_vector { index })
-{}
-
-inline
-identifier::identifier(std::string && name, unsigned index)
-  : identifier(std::move(name), index_vector { index })
-{}
-
-inline
-identifier::identifier(const std::string & name, unsigned index1, unsigned index2)
-  : identifier(std::string(name), index_vector { index1, index2 })
-{}
-
-inline
-identifier::identifier(std::string && name, unsigned index1, unsigned index2)
-  : identifier(std::move(name), index_vector { index1, index2 })
-{}
 
 inline
 identifier::identifier(const char * name, const index_vector & indices)
@@ -1930,16 +2101,6 @@ identifier::identifier(const char * name, const index_vector & indices)
 inline
 identifier::identifier(const char * name, index_vector && indices)
   : identifier(std::string(name), std::move(indices))    
-{}
-
-inline
-identifier::identifier(const char * name, unsigned index)
-  : identifier(std::string(name), index_vector { index })
-{}
-
-inline
-identifier::identifier(const char * name, unsigned index1, unsigned index2)
-  : identifier(std::string(name), index_vector { index1, index2 })
 {}
       
 inline

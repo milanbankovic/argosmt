@@ -559,7 +559,7 @@ object_factory<symbol::data> * symbol::_factory = 0;
 object_factory<keyword::data> * keyword::_factory = 0;
 object_factory<identifier::data> * identifier::_factory = 0;
 
-const unsigned identifier::UNSPECIFIED_INDEX = ((unsigned) 0xffffffff);
+const identifier::index identifier::UNSPECIFIED_INDEX = identifier::index();
 const identifier::index_vector identifier::EMPTY_INDEX_VECTOR = index_vector();
 identifier::index_vector identifier::_dummy_index_vector = index_vector();
 
@@ -602,10 +602,7 @@ void identifier::out(std::ostream & ostr) const
 	  it != end; ++it)
 	{
 	  ostr << ' ';
-	  if(*it == UNSPECIFIED_INDEX)
-	    ostr << '*'; 
-	  else
-	    ostr << *it;
+	  it->out(ostr);
 	}
       ostr << ")";
     }
@@ -634,10 +631,12 @@ const keyword keyword::ALL_STATISTICS = keyword(":all-statistics");
 const keyword keyword::PRINT_SUCCESS = keyword(":print-success");
 const keyword keyword::EXPAND_DEFINITIONS = keyword(":expand-definitions");
 const keyword keyword::INTERACTIVE_MODE = keyword(":interactive-mode");
+const keyword keyword::PRODUCE_ASSERTIONS = keyword(":produce-assertions");
 const keyword keyword::PRODUCE_PROOFS = keyword(":produce-proofs");
 const keyword keyword::PRODUCE_UNSAT_CORES = keyword(":produce-unsat-cores");
 const keyword keyword::PRODUCE_MODELS = keyword(":produce-models");
 const keyword keyword::PRODUCE_ASSIGNMENTS = keyword(":produce-assignments");
+const keyword keyword::GLOBAL_DECLARATIONS = keyword(":global-declarations");
 const keyword keyword::SYNTAX_CHECKING = keyword(":syntax-checking");
 const keyword keyword::LOGIC_SYNTAX_CHECKING = keyword(":logic-syntax-checking");
 const keyword keyword::REGULAR_OUTPUT_CHANNEL = keyword(":regular-output-channel");
@@ -652,7 +651,7 @@ const sort_symbol sort_symbol::BOOL = sort_symbol("Bool");
 const sort_symbol sort_symbol::INT = sort_symbol("Int");
 const sort_symbol sort_symbol::REAL = sort_symbol("Real");
 const sort_symbol sort_symbol::ARRAY = sort_symbol("Array");
-const sort_symbol sort_symbol::BITVEC = sort_symbol("BitVec", identifier::UNSPECIFIED_INDEX);
+const sort_symbol sort_symbol::BITVEC = sort_symbol("BitVec", { identifier::UNSPECIFIED_INDEX });
 
 const sort_parameter sort_parameter::UNDEFINED = sort_parameter("");
 const sort_parameter_vector EMPTY_SORT_PARAMETER_VECTOR = sort_parameter_vector();
@@ -680,14 +679,14 @@ const function_symbol function_symbol::LT = function_symbol("<");
 const function_symbol function_symbol::LE = function_symbol("<=");
 const function_symbol function_symbol::GT = function_symbol(">");
 const function_symbol function_symbol::GE = function_symbol(">=");
-const function_symbol function_symbol::DIVISIBLE = function_symbol("divisible", identifier::UNSPECIFIED_INDEX);
+const function_symbol function_symbol::DIVISIBLE = function_symbol("divisible", { identifier::UNSPECIFIED_INDEX });
 const function_symbol function_symbol::TO_REAL = function_symbol("to_real");
 const function_symbol function_symbol::TO_INT = function_symbol("to_int");
 const function_symbol function_symbol::IS_INT = function_symbol("is_int");
 const function_symbol function_symbol::SELECT = function_symbol("select");
 const function_symbol function_symbol::STORE = function_symbol("store");
 const function_symbol function_symbol::CONCAT = function_symbol("concat");
-const function_symbol function_symbol::EXTRACT = function_symbol("extract", identifier::UNSPECIFIED_INDEX, identifier::UNSPECIFIED_INDEX);
+const function_symbol function_symbol::EXTRACT = function_symbol("extract", { identifier::UNSPECIFIED_INDEX, identifier::UNSPECIFIED_INDEX });
 const function_symbol function_symbol::BVNOT = function_symbol("bvnot");
 const function_symbol function_symbol::BVNEG = function_symbol("bvneg");
 const function_symbol function_symbol::BVAND = function_symbol("bvand");
@@ -709,11 +708,11 @@ const function_symbol function_symbol::BVSDIV = function_symbol("bvsdiv");
 const function_symbol function_symbol::BVSREM = function_symbol("bvsrem");
 const function_symbol function_symbol::BVSMOD = function_symbol("bvsmod");
 const function_symbol function_symbol::BVASHR = function_symbol("bvashr");
-const function_symbol function_symbol::REPEAT = function_symbol("repeat", identifier::UNSPECIFIED_INDEX);
-const function_symbol function_symbol::ZERO_EXTEND = function_symbol("zero_extend", identifier::UNSPECIFIED_INDEX);
-const function_symbol function_symbol::SIGN_EXTEND = function_symbol("sign_extend", identifier::UNSPECIFIED_INDEX);
-const function_symbol function_symbol::ROTATE_LEFT = function_symbol("rotate_left", identifier::UNSPECIFIED_INDEX);
-const function_symbol function_symbol::ROTATE_RIGHT = function_symbol("rotate_right", identifier::UNSPECIFIED_INDEX);
+const function_symbol function_symbol::REPEAT = function_symbol("repeat", { identifier::UNSPECIFIED_INDEX });
+const function_symbol function_symbol::ZERO_EXTEND = function_symbol("zero_extend", { identifier::UNSPECIFIED_INDEX });
+const function_symbol function_symbol::SIGN_EXTEND = function_symbol("sign_extend", { identifier::UNSPECIFIED_INDEX });
+const function_symbol function_symbol::ROTATE_LEFT = function_symbol("rotate_left", { identifier::UNSPECIFIED_INDEX });
+const function_symbol function_symbol::ROTATE_RIGHT = function_symbol("rotate_right", { identifier::UNSPECIFIED_INDEX});
 const function_symbol function_symbol::BVULE = function_symbol("bvule");
 const function_symbol function_symbol::BVUGT = function_symbol("bvugt");
 const function_symbol function_symbol::BVUGE = function_symbol("bvuge");

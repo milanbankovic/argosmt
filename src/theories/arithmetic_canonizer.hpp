@@ -464,27 +464,24 @@ arithmetic_canonizer<mpq_class>::coeff_type arithmetic_canonizer<mpq_class>::get
   assert(e->get_symbol() == function_symbol::SLASH);
   
   const expression_vector & ops = e->get_operands();
-  
+
+  std::string s;
   if(ops[0]->is_numeral_constant())
     {
-      std::string s(ops[0]->get_special_constant().get_value());
+      s = ops[0]->get_special_constant().get_value();
       s += "/";
       s += ops[1]->get_special_constant().get_value();
-      coeff_type ret(s, 10);
-      ret.canonicalize();
-      return std::move(ret);
     }
   else
     {
-	
-      std::string s("-");
+      s = "-";
       s += ops[0]->get_operands()[0]->get_special_constant().get_value();
       s += "/";
       s += ops[1]->get_special_constant().get_value();
-      coeff_type ret(s, 10);
-      ret.canonicalize();
-      return std::move(ret); 
     }
+  coeff_type ret(s, 10);
+  ret.canonicalize();
+  return ret;
 }
 
 template <>
@@ -784,24 +781,21 @@ arithmetic_canonizer< hybrid_rational<int> >::get_value_from_expr(const expressi
   assert(e->get_symbol() == function_symbol::SLASH);
   
   const expression_vector & ops = e->get_operands();
-  
+
+  std::string num;
   if(ops[0]->is_numeral_constant())
     {
-      const std::string & num = ops[0]->get_special_constant().get_value();
-      const std::string & den = ops[1]->get_special_constant().get_value();
-      coeff_type ret(num, den);
-      ret.canonicalize();
-      return std::move(ret);
+      num = ops[0]->get_special_constant().get_value();
     }
   else
     {	
-      std::string num("-");
+      num = "-";
       num += ops[0]->get_operands()[0]->get_special_constant().get_value();
-      const std::string & den = ops[1]->get_special_constant().get_value();
-      coeff_type ret(num, den);
-      ret.canonicalize();
-      return std::move(ret); 
     }
+  const std::string & den = ops[1]->get_special_constant().get_value();
+  coeff_type ret(num, den);
+  ret.canonicalize();
+  return ret;
 }
 
 template <>
@@ -866,24 +860,22 @@ arithmetic_canonizer< hybrid_rational<long> >::get_value_from_expr(const express
   assert(e->get_symbol() == function_symbol::SLASH);
   
   const expression_vector & ops = e->get_operands();
-  
+
+  std::string num;
   if(ops[0]->is_numeral_constant())
     {
-      const std::string & num = ops[0]->get_special_constant().get_value();
-      const std::string & den = ops[1]->get_special_constant().get_value();
-      coeff_type ret(num, den);
-      ret.canonicalize();
-      return std::move(ret);
+      num = ops[0]->get_special_constant().get_value();
     }
   else
     {	
-      std::string num("-");
+      num = "-";
       num += ops[0]->get_operands()[0]->get_special_constant().get_value();
-      const std::string & den = ops[1]->get_special_constant().get_value();
-      coeff_type ret(num, den);
-      ret.canonicalize();
-      return std::move(ret); 
     }
+  const std::string & den = ops[1]->get_special_constant().get_value();
+  coeff_type ret(num, den);
+  ret.canonicalize();
+  return ret;
+
 }
 
 template <>

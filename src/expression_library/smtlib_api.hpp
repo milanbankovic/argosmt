@@ -223,13 +223,11 @@ public:
       when the solver_interface instance is assigned to an smtlib_api instance
       (i.e. when set_solver_interface() method of the smtlib_api class is 
       invoked). The user should not invoke this method directly. It sets the 
-      protected member _smt_lib_api to the given argument (assigned API) 
-      and then invokes init_interface() virtual method.
+      protected member _smt_lib_api to the given argument (assigned API).
   */
   void set_smt_lib_api(smtlib_api * smt_lib_api)
   {
     _smt_lib_api = smt_lib_api;
-    init_interface();
   }
 
   /** Returns a pointer to smtlib_api instance assigned to the solver.
@@ -242,13 +240,21 @@ public:
     return _smt_lib_api;
   }
 
-  /** Method is called from set_smtlib_api() after the _smt_lib_api protected
-      data member is set. By default, this method do nothing, but the user
-      can override this if some custom initialization of the solver is 
-      needed after the smtlib_api class instance is assigned to it. */
+  /** Method is called from set_solver_interface() method of the
+      smtlib_api class after the set_smt_lib_api(). By default, this
+      method do nothing, but the user can override this if some custom
+      initialization of the solver is needed after the smtlib_api
+      class instance is assigned to it. */
   virtual void init_interface()
   {}
 
+
+  /** Method is called from smtlib_api when reset() command is invoked. 
+      It does nothing by default, but it can be overriden by the custom
+      solver. */
+  virtual void reset_interface()
+  {}
+  
   /** Method should invoke SMT solver's algorithm. It should return 
       appropriate value (sat, unsat, or unknown). */
   virtual check_sat_response check_sat() = 0;
@@ -314,11 +320,12 @@ private:
 
   bool _print_success;
   bool _expand_definitions;
-  bool _interactive_mode;
+  bool _produce_assertions;
   bool _produce_proofs;
   bool _produce_unsat_cores;
   bool _produce_models;
   bool _produce_assignments;
+  bool _global_declarations;
   bool _syntax_checking;
   bool _logic_syntax_checking;
   std::ostream * _cout;
@@ -330,6 +337,7 @@ private:
 
 
   check_sat_response _response;
+  check_sat_response _expected_response;
   error_behavior _error_behavior;
   reason_unknown _reason_unknown;
 
@@ -386,7 +394,7 @@ public:
       of the option, and the attribute value is the value of the option. 
       Deep copy of the attribute is performed. Notice that for predefined 
       options, the type of the corresponding attribute value
-      must be adequate. For instance, :interactive-mode option should 
+      must be adequate. For instance, :produce-assertions option should 
       have a value of bool value (as well as other boolean options), 
       :verbosity option and :random-seed option should have a value of 
       unsigned long type, and :regular-output-channel and
@@ -403,7 +411,7 @@ public:
   /** Sets option. Option is given as pair (keyword, standard_value),
       where standard_value is any copy/move-constructible, assignable and
       << printable value. Notice that for predefined options, the type T
-      must be adequate. For instance, :interactive-mode option should 
+      must be adequate. For instance, :produce-assertions option should 
       have a value of bool value (as well as other boolean options), 
       :verbosity option and :random-seed option should have a value of 
       unsigned long type, and :regular-output-channel and
@@ -445,9 +453,13 @@ public:
   /** Gets the value of :expand-definitions option. */
   bool expand_definitions() const;
 
-  /** Gets the value of :interactive-mode option. */
+  /** Gets the value of :interactive-mode option (the same as
+      :produce-assertions option, as of SMTLIB 2.5). */
   bool interactive_mode() const;
 
+  /** Gets the value of :produce-assertions option. */
+  bool produce_assertions() const;
+  
   /** Gets the value of :print-success option. */
   bool produce_proofs() const;
     
@@ -460,6 +472,9 @@ public:
   /** Gets the value of :produce-assignments option. */
   bool produce_assignments() const;
 
+  /** Gets the value of :global-declarations option. */
+  bool global_declarations() const;
+  
   /** Gets the value of :syntax-checking option. This is an extension
       of the standard -- setting this option value to true or false 
       the user can choose between well-sortedness checking on or off. */
@@ -485,8 +500,11 @@ public:
   unsigned long verbosity() const;
 
   /** Gets the value of :status info. */
-  check_sat_response get_check_sat_response() const;
+  check_sat_response get_expected_response() const;
 
+  /** Gets the response of the most recent call to check-sat command */
+  check_sat_response get_response() const;
+  
   /** Gets the value of :error-behavior info. */
   error_behavior get_error_behavior() const;
 
@@ -530,6 +548,9 @@ public:
   
   /** Invokes sort expansion. */
   sort expand_sort(const sort & sr) const;
+
+  /** Declares constant symbol. Corresponds to declare-const API command. */
+  void declare_const(const function_symbol & sm, const sort & s);
   
   /** Declares function symbol. Corresponds to declare-fun API command. */
   void declare_function(const function_symbol & sm, const rank & rn);
@@ -645,16 +666,27 @@ public:
 
   /** Returns the vector containing the expressions from the set of 
       all assertions. This method can be invoked even if the 
-      :interactive-mode option is set to false. */ 
+      :produce-assertions option is set to false. */ 
   const expression_vector & assertions() const;
 
   /** Returns the vector containing the expressions from the set of 
       all assertions. It corresponds to get-assertions
-      API command. It should be called only if :interactive-mode option
+      API command. It should be called only if :produce-assertions option
       is set to true (default is false). Otherwise, it throws 
       an exception. */
   const expression_vector & get_assertions() const;
 
+  /** Empties the assertion stack. It corresponds to reset-assertions
+      API command. If :global-declarations option is true,
+      declarations and definitions that were introduced while
+      :global-declaration option was true are not removed (since they
+      are global). Otherwise, all declarations and definitions are also
+      removed. */
+  void reset_assertions();
+
+  /** Resets the interface and the associated solver */
+  void reset();
+  
   /** Returns the assignment of values to the expressions from exps. It 
       corresponds to get-value API command. It invokes get_value() method
       of the solver interface. It should be called only if :produce-models
@@ -679,7 +711,10 @@ public:
       be called only if :produce-unsat-cores option is set to true (default
       is false). Otherwise, it throws an exception. */
   expression_vector get_unsat_core() const;
-      
+
+  /** Prints the message back to the output stream */
+  void echo(const std::string & message) const;
+  
   /** Parse the input from the input stream. It invokes LEX/YACC generated
       parser. The parser catches all exceptions and prints appropriate
       messages. If :error-behavior info is set to immediate-exit (which
@@ -782,8 +817,15 @@ bool smtlib_api::expand_definitions() const
 inline
 bool smtlib_api::interactive_mode() const
 {
-  return _interactive_mode;
+  return _produce_assertions;
 }
+
+inline
+bool smtlib_api::produce_assertions() const
+{
+  return _produce_assertions;
+}
+
 
 inline
 bool smtlib_api::produce_proofs() const
@@ -807,6 +849,12 @@ inline
 bool smtlib_api::produce_assignments() const
 {
   return _produce_assignments;
+}
+
+inline
+bool smtlib_api::global_declarations() const
+{
+  return _global_declarations;
 }
 
 inline
@@ -846,7 +894,13 @@ unsigned long smtlib_api::verbosity() const
 }
 
 inline
-check_sat_response smtlib_api::get_check_sat_response() const
+check_sat_response smtlib_api::get_expected_response() const
+{
+  return _expected_response;
+}
+
+inline
+check_sat_response smtlib_api::get_response() const
 {
   return _response;
 }
@@ -941,8 +995,11 @@ void smtlib_api::declare_sort(const sort_symbol & sm, arity ar)
 {
   if(!_logic)
     throw logic_not_set_exception("declare-sort");
-  
-  _expansion_signatures.back()->add_sort_symbol(sm, ar);
+
+  if(_global_declarations)
+    _expansion_signatures[0]->add_sort_symbol(sm, ar);
+  else 
+    _expansion_signatures.back()->add_sort_symbol(sm, ar);
 }
 
 inline
@@ -963,7 +1020,10 @@ void smtlib_api::define_sort(const sort_symbol & sm,
   
   attribute_set attr(HASH_TABLE_SIZE);
   attr.insert(attribute(keyword::DEFINITION, sort_definition(std::move(pars), sr)));
-  _expansion_signatures.back()->add_sort_symbol(sm, pars.size(), std::move(attr));
+  if(_global_declarations)
+    _expansion_signatures[0]->add_sort_symbol(sm, pars.size(), std::move(attr));
+  else
+    _expansion_signatures.back()->add_sort_symbol(sm, pars.size(), std::move(attr));
 }
 
 
@@ -976,14 +1036,31 @@ sort smtlib_api::expand_sort(const sort & sr) const
   return sr->expand_sort(); 
 }
 
+
+inline
+void smtlib_api::
+declare_const(const function_symbol & sm, const sort & s)
+{
+  if(!_logic)
+    throw logic_not_set_exception("declare-const");
+
+  if(_global_declarations)
+    _expansion_signatures[0]->add_function_symbol(sm, s);
+  else 
+    _expansion_signatures.back()->add_function_symbol(sm, s);
+}
+
 inline
 void smtlib_api::
 declare_function(const function_symbol & sm, const rank & rn)
 {
   if(!_logic)
     throw logic_not_set_exception("declare-fun");
-  
-  _expansion_signatures.back()->add_function_symbol(sm, rn);
+
+  if(_global_declarations)
+    _expansion_signatures[0]->add_function_symbol(sm, rn);
+  else
+    _expansion_signatures.back()->add_function_symbol(sm, rn);
 }
 
 inline
@@ -992,8 +1069,11 @@ declare_function(const function_symbol & sm, rank && rn)
 {
   if(!_logic)
     throw logic_not_set_exception("declare-fun");
-  
-  _expansion_signatures.back()->add_function_symbol(sm, std::move(rn));
+
+  if(_global_declarations)
+    _expansion_signatures[0]->add_function_symbol(sm, std::move(rn));
+  else
+    _expansion_signatures.back()->add_function_symbol(sm, std::move(rn));
 }
 
 inline
@@ -1003,7 +1083,10 @@ declare_function(const function_symbol & sm, const sort & s)
   if(!_logic)
     throw logic_not_set_exception("declare-fun");
 
-  _expansion_signatures.back()->add_function_symbol(sm, s);
+  if(_global_declarations)
+    _expansion_signatures[0]->add_function_symbol(sm, s);
+  else
+    _expansion_signatures.back()->add_function_symbol(sm, s);
 }
 
 inline
@@ -1015,7 +1098,10 @@ declare_function(const function_symbol & sm,
   if(!_logic)
     throw logic_not_set_exception("declare-fun");
 
-  _expansion_signatures.back()->add_function_symbol(sm, s1, s2);
+  if(_global_declarations)
+    _expansion_signatures[0]->add_function_symbol(sm, s1, s2);
+  else 
+    _expansion_signatures.back()->add_function_symbol(sm, s1, s2);
 }
 
 inline
@@ -1027,8 +1113,11 @@ declare_function(const function_symbol & sm,
 {
   if(!_logic)
     throw logic_not_set_exception("declare-fun");
-  
-  _expansion_signatures.back()->add_function_symbol(sm, s1, s2, s3);
+
+  if(_global_declarations)
+    _expansion_signatures[0]->add_function_symbol(sm, s1, s2, s3);
+  else
+    _expansion_signatures.back()->add_function_symbol(sm, s1, s2, s3);
 }
 
 inline
@@ -1041,8 +1130,11 @@ declare_function(const function_symbol & sm,
 {
   if(!_logic)
     throw logic_not_set_exception("declare-fun");
-  
-  _expansion_signatures.back()->add_function_symbol(sm, s1, s2, s3, s4);
+
+  if(_global_declarations)
+    _expansion_signatures[0]->add_function_symbol(sm, s1, s2, s3, s4);
+  else
+    _expansion_signatures.back()->add_function_symbol(sm, s1, s2, s3, s4);
 }
 
 inline
@@ -1101,6 +1193,7 @@ void smtlib_api::set_solver_interface(solver_interface * sl)
 {
   _solver_interface = sl;
   _solver_interface->set_smt_lib_api(this);
+  _solver_interface->init_interface();
 }
 
 inline
@@ -1118,8 +1211,7 @@ check_sat_response smtlib_api::check_sat()
   if(!_solver_interface)
     throw solver_interface_not_set_exception("check-sat");
 
-  set_info(keyword::STATUS, _solver_interface->check_sat());
-  return _response;
+  return (_response = _solver_interface->check_sat());
 }
 
 inline
@@ -1131,9 +1223,16 @@ const expression_vector & smtlib_api::assertions() const
 inline
 const expression_vector & smtlib_api::get_assertions() const
 {
-  if(!_interactive_mode)
-    throw command_error_exception("get-assertions permitted only in interactive mode");
+  if(!_produce_assertions)
+    throw command_error_exception("get-assertions permitted only in when :produce-assertions option is on");
   return _assertions;
+}
+
+
+inline 
+void smtlib_api::echo(const std::string & message) const
+{
+  cout() << message << std::endl;
 }
 
 #endif // _SMTLIB_API_H

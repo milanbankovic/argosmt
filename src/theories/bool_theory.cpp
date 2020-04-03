@@ -40,7 +40,7 @@ unsigned bool_theory::find_initial_watches(clause * cl, unsigned & w0, unsigned 
   unsigned w = 0;
   w0 = 0;
   w1 = 1;
-  
+
   unsigned w0_index = _solver.get_trail().get_trail_index_if_falsified((*cl)[0]);
   unsigned w1_index = _solver.get_trail().get_trail_index_if_falsified((*cl)[1]);
 
@@ -54,8 +54,8 @@ unsigned bool_theory::find_initial_watches(clause * cl, unsigned & w0, unsigned 
     w = 2;
   else if(w0_index == UNDEFINED_TRAIL_INDEX)
     w = 1;
-  
-  
+
+
   for(unsigned i = 2; w < 2 && i < cl->size(); i++)
     {
       unsigned i_index = _solver.get_trail().get_trail_index_if_falsified((*cl)[i]);
@@ -72,17 +72,17 @@ unsigned bool_theory::find_initial_watches(clause * cl, unsigned & w0, unsigned 
 	  w1_index = i_index;
 	  w1 = i;
 	}
-      
+
       if(i_index == UNDEFINED_TRAIL_INDEX)
 	w++;
     }
-  
-  return w;  
+
+  return w;
 }
 
 
 void bool_theory::set_initial_watches(clause * cl)
-{  
+{
   // special case -- empty clause!!
   if(cl->size() == 0)
     {
@@ -114,7 +114,7 @@ void bool_theory::set_initial_watches(clause * cl)
     {
       unsigned w0, w1;
       unsigned w = find_initial_watches(cl, w0, w1);
-      
+
       if(w == 0)
 	{
 	  _solver.apply_conflict(explanation(&_solver, cl), this);
@@ -138,8 +138,8 @@ void bool_theory::set_initial_watches(clause * cl)
 	      count_conflicts(cl);
 	    }
 	}
-      
-      unsigned w1_level = _solver.get_trail().get_trail_level((*cl)[w1]); 
+
+      unsigned w1_level = _solver.get_trail().get_trail_level((*cl)[w1]);
       unsigned curr_level =  _solver.get_trail().current_level();
 
       if(w < 2 && w1_level < curr_level)
@@ -149,11 +149,11 @@ void bool_theory::set_initial_watches(clause * cl)
       else
 	{
 	  cl->set_watch_pos(0, w0);
-	  watch_list & w0_list = get_theory_data((*cl)[w0])->get_watch_list(); 
+	  watch_list & w0_list = get_theory_data((*cl)[w0])->get_watch_list();
 	  w0_list.push_back(cl);
-	  
+
 	  cl->set_watch_pos(1, w1);
-	  watch_list & w1_list = get_theory_data((*cl)[w1])->get_watch_list(); 
+	  watch_list & w1_list = get_theory_data((*cl)[w1])->get_watch_list();
 	  w1_list.push_back(cl);
 	}
     }
@@ -172,9 +172,9 @@ void bool_theory::process_watch_list(const expression & lp)
 {
   watch_list & watch_list = get_theory_data(lp)->get_watch_list();
   unsigned k = 0;
-  
+
   for(unsigned j = 0; j < watch_list.size(); j++)
-    {      
+    {
       clause * cl = watch_list[j];
       unsigned w = cl->get_watch_literal(0) == lp ? 0 : 1;
       expression owl = cl->get_watch_literal(1 - w);
@@ -186,10 +186,10 @@ void bool_theory::process_watch_list(const expression & lp)
 	  watch_list[k++] = cl;
 	  continue;
 	}
-      
-      if(find_alternative_watch(cl, w)) 
+
+      if(find_alternative_watch(cl, w))
 	continue;
-      
+
       if(owl_value == EB_UNDEFINED)
 	{
 	  _solver.apply_propagate(owl, this);
@@ -203,12 +203,12 @@ void bool_theory::process_watch_list(const expression & lp)
 	  count_conflicts(cl);
 	  while(j < watch_list.size())
 	    {
-	      watch_list[k++] = watch_list[j++]; 
+	      watch_list[k++] = watch_list[j++];
 	    }
-	  break;	  
-	}      
+	  break;
+	}
     }
-  watch_list.resize(k);  
+  watch_list.resize(k);
 }
 
 bool bool_theory::find_alternative_watch(clause * cl, unsigned cw)
@@ -220,11 +220,11 @@ bool bool_theory::find_alternative_watch(clause * cl, unsigned cw)
     {
       if(i == pos0 || i == pos1)
 	continue;
-      
+
       if(!_solver.get_trail().is_false((*cl)[i]))
 	{
 	  cl->set_watch_pos(cw, i);
-	  get_theory_data((*cl)[i])->get_watch_list().push_back(cl);	
+	  get_theory_data((*cl)[i])->get_watch_list().push_back(cl);
 	  return true;
 	}
     }
@@ -240,14 +240,14 @@ bool bool_theory::is_clause_true(const trail & tr, clause * cl)
 }
 
 void bool_theory::remove_clauses(const std::vector<clause *> & learnt_clauses,
-				 unsigned number_of_clauses) 
+				 unsigned number_of_clauses)
 {
-  for(unsigned i = learnt_clauses.size() - number_of_clauses; 
+  for(unsigned i = learnt_clauses.size() - number_of_clauses;
       i < learnt_clauses.size(); i++)
     {
       clause * cl = learnt_clauses[i];
-      
-      std::vector<clause *>::iterator it = 
+
+      std::vector<clause *>::iterator it =
 	std::find(_pending_clauses.begin(), _pending_clauses.end(), cl);
 
       if(it != _pending_clauses.end())
@@ -256,9 +256,9 @@ void bool_theory::remove_clauses(const std::vector<clause *> & learnt_clauses,
 	  _pending_clauses.pop_back();
 	  continue;
 	}
-      
+
       it = std::find(_dead_clauses.begin(), _dead_clauses.end(), cl);
-      
+
       if(it != _dead_clauses.end())
 	{
 	  *it = _dead_clauses.back();
@@ -268,7 +268,7 @@ void bool_theory::remove_clauses(const std::vector<clause *> & learnt_clauses,
 
       if(cl->size() < 2)
 	continue;
-      
+
       for(unsigned j = 0; j < 2; j++)
 	{
 	  watch_list & wl = get_theory_data(cl->get_watch_literal(j))->get_watch_list();
@@ -367,24 +367,24 @@ expression bool_theory::canonize_expression(const expression & e)
     }
 
   if(ep->is_positive_sat_literal())
-    return negative ? 
+    return negative ?
       _solver.get_factory()->create_expression(ep->get_sat_variable(),
 					       SLP_NEGATIVE) : ep;
-  
- 
+
+
   if(ep->is_negative_sat_literal())
     return negative ?
       _solver.get_factory()->create_expression(ep->get_sat_variable(),
 					       SLP_POSITIVE) : ep;
-  
+
   if(ep->is_true())
     return negative ?
       _solver.get_factory()->FALSE_EXPRESSION() : ep;
-  
+
   if(ep->is_false())
     return negative ?
       _solver.get_factory()->TRUE_EXPRESSION() : ep;
-  
+
   return e;
 }
 
@@ -426,26 +426,26 @@ void bool_theory::get_literal_pair(const expression & l, expression & l_pos, exp
 
 bool bool_theory::verify_assignment(const trail & tr)
 {
-  const std::vector<clause *> & initial_clauses = 
+  const std::vector<clause *> & initial_clauses =
     _solver.get_initial_clauses();
   for(unsigned i = 0; i < initial_clauses.size(); i++)
     if(!is_clause_true(tr, initial_clauses[i]))
       return false;
-  
+
   return true;
 }
 
 void bool_theory::get_model(const expression_vector & exps)
 {
   for(unsigned i = 0; i < exps.size(); i++)
-    { 
+    {
       if(exps[i]->has_expression_data() && _solver.has_literal_data(exps[i]))
 	{
 	  switch(_solver.get_trail().get_value(exps[i]))
 	    {
 	    case EB_UNDEFINED:
 	      exps[i]->set_assigned(_solver.get_factory()->UNDEFINED_EXPRESSION());
-	      break;	   
+	      break;
 	    case EB_TRUE:
 	      exps[i]->set_assigned(_solver.get_factory()->TRUE_EXPRESSION());
 	      break;

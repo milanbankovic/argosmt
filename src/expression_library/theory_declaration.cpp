@@ -398,7 +398,7 @@ public:
     else
       return false;
       
-    sort_symbol bv_sym(sort_symbol::BITVEC.get_name(), index);
+    sort_symbol bv_sym(sort_symbol::BITVEC.get_name(), { index });
     sort bv_sort = _signature->get_sort_factory()->create_sort(bv_sym);
       
     if(sr == _signature->get_sort_factory()->UNDEFINED_SORT())
@@ -437,10 +437,10 @@ public:
        op1->get_symbol().get_indices().size() != 1)
       return false;
       
-    unsigned i = op0->get_symbol().get_indices()[0];
-    unsigned j = op1->get_symbol().get_indices()[0];
+    unsigned i = op0->get_symbol().get_indices()[0].get_unsigned_value();
+    unsigned j = op1->get_symbol().get_indices()[0].get_unsigned_value();
       
-    sort_symbol res_sym(sort_symbol::BITVEC.get_name(), i + j);
+    sort_symbol res_sym(sort_symbol::BITVEC.get_name(), { i + j });
     sort res_sort = _signature->get_sort_factory()->create_sort(res_sym);
       
     if(return_sort == _signature->get_sort_factory()->UNDEFINED_SORT())
@@ -474,17 +474,17 @@ public:
        op0->get_symbol().get_indices().size() != 1)
       return false;
       
-    unsigned m = op0->get_symbol().get_indices()[0];
+    unsigned m = op0->get_symbol().get_indices()[0].get_unsigned_value();
       
     if(symbol.get_indices().size() != 2)
       return false;
     
-    unsigned i = symbol.get_indices()[0];
-    unsigned j = symbol.get_indices()[1];
+    unsigned i = symbol.get_indices()[0].get_unsigned_value();
+    unsigned j = symbol.get_indices()[1].get_unsigned_value();
       
     if(j > i || i >= m) return false;
       
-    sort_symbol res_sym(sort_symbol::BITVEC.get_name(), i - j + 1);
+    sort_symbol res_sym(sort_symbol::BITVEC.get_name(), { i - j + 1 });
     sort res_sort = _signature->get_sort_factory()->create_sort(res_sym);
       
     if(return_sort == _signature->get_sort_factory()->UNDEFINED_SORT())

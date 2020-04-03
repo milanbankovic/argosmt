@@ -1920,7 +1920,7 @@ void arithmetic_theory::check_equalities()
 		{
 		  generate_propagation_explanation(u_csts[j], cst, expl);
 		  _solver.apply_propagate(u_csts[j], this);
-		  std::cout << "PROPAGATING: " << u_csts[j] << std::endl;
+		  //std::cout << "PROPAGATING: " << u_csts[j] << std::endl;
 		  get_theory_data(u_csts[j])->literal_explanation() = expl;
 		}
 	      else if(eb == EB_FALSE)
