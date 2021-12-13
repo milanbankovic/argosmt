@@ -6,9 +6,6 @@
 /* Define to 1 if you have the `gmp' library (-lgmp). */
 #undef HAVE_LIBGMP
 
-/* Define to 1 if you have the `tbb' library (-ltbb). */
-#undef HAVE_LIBTBB
-
 /* Name of package */
 #undef PACKAGE
 

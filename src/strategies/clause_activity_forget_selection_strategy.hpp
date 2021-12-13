@@ -77,7 +77,7 @@ public:
   }
   
   virtual void conflict_applied(const explanation & conflicting, 				
-				theory * conflict_theory)
+				const theory_solver * conflict_ts)
   {
     if(conflicting.is_clause_explanation())
       bump_clause(conflicting.get_clause());

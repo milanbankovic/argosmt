@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2015 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2015,2021 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -157,10 +157,10 @@ sort_vector get_sorts(const expression_vector & expressions)
 
 inline
 expression function_expression_node::
-get_instance(const substitution & sb)
+get_instance(const substitution & sb) const
 {
   if(_operands->empty())
-    return this->shared_from_this();
+    return const_cast<function_expression_node*>(this)->shared_from_this();
 
   expression_vector ops;
   
@@ -296,10 +296,10 @@ function_expression_node::check_expression(const signature * sg,
 }
 
 
-expression function_expression_node::infer_sorts()
+expression function_expression_node::infer_sorts() const
 {
   if(_factory->get_signature()->get_syntax_checking())
-    return this->shared_from_this();
+    return const_cast<function_expression_node*>(this)->shared_from_this();
 
   expression_vector infered_ops;
   for(expression_vector::const_iterator it = _operands->begin(),
@@ -319,7 +319,7 @@ expression function_expression_node::infer_sorts()
 
 expression function_expression_node::
 expand_expression(const signature * sg,
-		  search_mode smode)
+		  search_mode smode) const
 {
 
   expression_vector expanded_operands;
@@ -401,10 +401,10 @@ function_expression_node::out(std::ostream & ostr) const
 }
 
 
-expression function_expression_node::eliminate_let_binders(substitution && sub)
+expression function_expression_node::eliminate_let_binders(substitution && sub) const
 {
   if(_operands->empty())
-    return this->shared_from_this();
+    return const_cast<function_expression_node*>(this)->shared_from_this();
 
   expression_vector nolet_operands;
   for(expression_vector::const_iterator it = _operands->begin(),
@@ -631,7 +631,7 @@ sorted_variable get_unique_variable(const expression_vector & expv,
 }
 
 expression quantifier_expression_node::
-get_instance(const substitution & sb)
+get_instance(const substitution & sb) const
 {
   substitution s;
   for(substitution::const_iterator it = sb.begin(),
@@ -644,12 +644,12 @@ get_instance(const substitution & sb)
     }
  
   if(s.empty())
-    return this->shared_from_this();
+    return const_cast<quantifier_expression_node*>(this)->shared_from_this();
 
   substitution vsub;
   sorted_variable_vector sub_vars;
   expression_vector expv;
-  expv.push_back(this->shared_from_this());
+  expv.push_back(const_cast<quantifier_expression_node*>(this)->shared_from_this());
   for(substitution::const_iterator sit = s.begin(), 
 	sit_end = s.end(); sit != sit_end; ++sit)
     expv.push_back(sit->second);
@@ -745,10 +745,10 @@ bool quantifier_expression_node::is_instance(const expression & exp,
   return retval;
 }
 
-expression quantifier_expression_node::infer_sorts()
+expression quantifier_expression_node::infer_sorts() const
 {
   if(_factory->get_signature()->get_syntax_checking())
-    return this->shared_from_this();
+    return const_cast<quantifier_expression_node*>(this)->shared_from_this();
 
   expression infered_expr = _expr->infer_sorts();
 
@@ -769,7 +769,7 @@ expression quantifier_expression_node::infer_sorts()
   
 expression quantifier_expression_node::
 expand_expression(const signature * sg,
-		  search_mode smode)
+		  search_mode smode) const
 { 
   sorted_variable_vector exp_vars;
     
@@ -951,10 +951,10 @@ let_expression_node::check_expression(const signature * sg,
   return _expr->check_expression(sg, smode);
 }
 
-expression let_expression_node::infer_sorts()
+expression let_expression_node::infer_sorts() const
 {
   if(_factory->get_signature()->get_syntax_checking())
-    return this->shared_from_this();
+    return const_cast<let_expression_node*>(this)->shared_from_this();
 
   expression infered_expr = _expr->infer_sorts();
   variable_binding_vector infered_bind;
@@ -972,7 +972,7 @@ expression let_expression_node::infer_sorts()
 
 
 expression let_expression_node::
-get_instance(const substitution & sb)
+get_instance(const substitution & sb) const
 {
 
   /* Instead the expression (let x1 -> t1, ..., xn -> tn) F, we consider
@@ -1072,7 +1072,7 @@ bool let_expression_node::is_instance(const expression & exp,
 
 expression let_expression_node::
 expand_expression(const signature * sg,
-		  search_mode smode)
+		  search_mode smode) const
 {  
   variable_binding_vector expanded_bind;
   for(variable_binding_vector::const_iterator it = _bind->begin(),
@@ -1106,7 +1106,7 @@ let_expression_node::out(std::ostream & ostr) const
 } 
 
 
-expression let_expression_node::eliminate_let_binders(substitution && sub)
+expression let_expression_node::eliminate_let_binders(substitution && sub) const
 {
   std::unordered_set<variable> var_set;
   for(variable_binding_vector::const_iterator it = _bind->begin(), 

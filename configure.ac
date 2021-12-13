@@ -37,7 +37,7 @@ fi
 AC_CHECK_LIB([gmp],[main],[],[AC_MSG_ERROR([GMP library not found!], [1])]) 
 
 # General C++ options
-CXXFLAGS="-pedantic -Wall -std=c++14"
+CXXFLAGS="-pedantic -Wall -std=c++17"
 #CXXFLAGS+=" -msse -msse2 -msse3 -mfpmath=sse"
 
 # Choosing build mode (optimize vs debug vs profile)
@@ -170,87 +170,13 @@ if test "x$use_kat" = "xyes" ; then
       CXXFLAGS+=" -D_USE_KATSIRELOS_EXPLANATIONS"
 fi
 
-# TBB use switch
-use_tbb=no
-
-# Simplex paralelization switch
-parallel_simplex=no
-AC_ARG_ENABLE([parallel-simplex], [AC_HELP_STRING([--enable-parallel-simplex],
-    [build with parallel simplex enabled (default NO)])],
-    [parallel_simplex=$enableval])
-
-if test "x$parallel_simplex" = "xyes" ; then
-      echo "---------------------------------"
-      echo "-   Parallel simplex enabled    -"
-      echo "---------------------------------"
-
-      CXXFLAGS+=" -D_PARALLEL_SIMPLEX"
-      use_tbb=yes
-fi
-
-# Portfolio paralelization switch
-parallel_portfolio=no
-AC_ARG_ENABLE([parallel-portfolio], [AC_HELP_STRING([--enable-parallel-portfolio],
-    [build with parallel portfolio enabled (default NO)])],
-    [parallel_portfolio=$enableval])
-
-if test "x$parallel_portfolio" = "xyes" ; then
-      echo "---------------------------------"
-      echo "-   Parallel portfolio enabled  -"
-      echo "---------------------------------"
-
-      CXXFLAGS+=" -D_PARALLEL_PORTFOLIO"
-      use_tbb=yes
-fi
-
-# Specifying path to tbb library (if not installed on system)
-tbb_path=''
-AC_ARG_ENABLE([tbb-path], [AC_HELP_STRING([--enable-tbb-path=PATH],
-    [path to TBB installation])],
-    [test x$enableval != x && tbb_path=$enableval])
-
-if test "x$tbb_path" = "x" ; then
-   TBBPATHFLAGS=""
-else
-   TBBPATHFLAGS="-L$tbb_path"
-fi
-
-# Specifying path to tbb headers (if not installed on system)
-tbb_include_path=''
-AC_ARG_ENABLE([tbb-include-path], [AC_HELP_STRING([--enable-tbb-include-path=PATH],
-    [path to TBB headers])],
-    [test x$enableval != x && tbb_include_path=$enableval])
-
-if test "x$tbb_include_path" = "x" ; then
-   TBINCLUDEBPATHFLAGS=""
-else
-   TBBINCLUDEPATHFLAGS="-I$tbb_include_path"
-fi
-
-# Including TBB if needed
-if test "x$use_tbb" = "xyes" ; then
-      echo "------------------"
-      echo "-   using TBB    -"
-      echo "------------------"
-
-      # If tbb library path is not specified, check for system installation
-      if test "x$tbb_path" = "x" ; then
-         AC_CHECK_LIB([tbb], [main], [], [AC_MSG_ERROR([TBB library not found!], [1])])
-      fi
-
-      CXXFLAGS+=" -D_USE_TBB $TBBINCLUDEPATHFLAGS"
-      LDFLAGS="-fno-builtin-malloc -fno-builtin-free -fno-builtin-realloc -fno-builtin-calloc"
-      LIBS+=" $TBBPATHFLAGS -ltbbmalloc_proxy -ltbbmalloc -ltbb"
-fi
-
-
-
 AC_CONFIG_FILES([Makefile
                  src/Makefile
 		 src/auxiliary/Makefile
                  src/expression_library/Makefile
 	 	 src/data_structures/Makefile
-		 src/theories/Makefile
+		 src/theory_solvers/Makefile
                  src/strategies/Makefile
+		 src/quantifiers/Makefile
 		 src/solver/Makefile])
 AC_OUTPUT

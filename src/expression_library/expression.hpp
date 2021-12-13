@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2015 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2015,2021 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -350,7 +350,7 @@ public:
   virtual const sort & get_sort() const = 0;
 
   /** Returns true if the sort of the expression is Bool. */
-  bool is_formula();
+  bool is_formula() const;
 
   /** Returns the variable represented by the node (in case of T_VARIABLE
       type), or variable::UNDEFINED, otherwise. */
@@ -412,7 +412,7 @@ public:
       with expressions given in substitution in the expression represented 
       by the node. Recall that substitution is a map that maps variables
       with expressions which replace them. */
-  virtual expression get_instance(const substitution & sb) = 0;
+  virtual expression get_instance(const substitution & sb) const = 0;
 
   /** Returns true if the expression represented by the 
       argument can be obtained from this expression, using some substitution
@@ -440,7 +440,7 @@ public:
       an appropriate exception is thrown. This method makes sense only if
       syntax checking is turned off (otherwise, sort inference is performed
       during the construction of expressions). */
-  virtual expression infer_sorts() = 0;
+  virtual expression infer_sorts() const = 0;
 
   /** Returns the expression obtained from this by expanding function symbol 
       definitions. The smode argument defines in which signatures the 
@@ -449,11 +449,11 @@ public:
       expansion. */
   virtual expression 
   expand_expression(const signature * sg,
-		    search_mode smode = S_CONTEXTUAL) = 0;
+		    search_mode smode = S_CONTEXTUAL) const = 0;
 
   /** Expands expression with respect to the main signature and 
       _contextual_ search mode (default mode). */
-  expression expand_expression();
+  expression expand_expression() const;
 
   /** Support for visitor design pattern. Subexpressions are traversed in a
       depth-first order, applying the visitor to each node. */
@@ -462,7 +462,7 @@ public:
 
   /** Returns the expression obtained from this expression by elimination
       of let binders. */
-  virtual expression eliminate_let_binders(substitution && sub = substitution()) = 0;
+  virtual expression eliminate_let_binders(substitution && sub = substitution()) const = 0;
   
   /** Equivalent to get_type() == T_UNDEFINED. */
   bool is_undefined() const;
@@ -547,7 +547,7 @@ public:
   bool is_equality() const;
 
   /** Equivalent to get_symbol() == "=" && get_operands()[0]->is_formula(). */
-  bool is_equivalence();
+  bool is_equivalence() const;
 
   /** Equivalent to get_operands().size() == 2 && get_symbol() == "distinct". */
   bool is_disequality() const;
@@ -727,7 +727,7 @@ public:
   virtual const expression_vector & get_operands() const;
   virtual sat_variable get_sat_variable() const;
   virtual sat_literal_polarity get_sat_literal_polarity() const;
-  virtual expression get_instance(const substitution & sb);
+  virtual expression get_instance(const substitution & sb) const;
   virtual bool is_instance(const expression & exp,
 			   substitution & sb) const;
   
@@ -735,9 +735,9 @@ public:
 
   virtual bool check_expression(const signature * sg,
 				search_mode smode = S_CONTEXTUAL)  const; 
-  virtual expression infer_sorts();
+  virtual expression infer_sorts() const;
   virtual expression expand_expression(const signature * sg,
-				       search_mode smode = S_CONTEXTUAL);
+				       search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(expression_visitor & visitor);
 
   virtual unsigned get_complexity() const;
@@ -745,7 +745,7 @@ public:
   virtual bool equal_to(const expression_node * node) const;
   virtual void out(std::ostream & ostr) const; 
   virtual bool less_than(const expression_node * node) const;
-  virtual expression eliminate_let_binders(substitution && sub);
+  virtual expression eliminate_let_binders(substitution && sub) const;
 };
 
 
@@ -784,14 +784,14 @@ public:
   virtual const expression_vector & get_operands() const;
   virtual sat_variable get_sat_variable() const;
   virtual sat_literal_polarity get_sat_literal_polarity() const;
-  virtual expression get_instance(const substitution & sb);
+  virtual expression get_instance(const substitution & sb) const;
   virtual bool is_instance(const expression & exp,
 			   substitution & sb) const;
   virtual bool check_expression(const signature * sg,
 				search_mode smode = S_CONTEXTUAL) const; 
-  virtual expression infer_sorts();
+  virtual expression infer_sorts() const;
   virtual expression expand_expression(const signature * sg,
-				       search_mode smode = S_CONTEXTUAL);
+				       search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(expression_visitor & visitor);
 
   virtual expression clone_expression(expression_factory * other_factory) const;
@@ -801,7 +801,7 @@ public:
   virtual bool equal_to(const expression_node * node) const;
   virtual void out(std::ostream & ostr) const; 
   virtual bool less_than(const expression_node * node) const;
-  virtual expression eliminate_let_binders(substitution && sub);
+  virtual expression eliminate_let_binders(substitution && sub) const;
 };
 
 /** Represents the special constant expression node. */
@@ -836,14 +836,14 @@ public:
   virtual const expression_vector & get_operands() const;
   virtual sat_variable get_sat_variable() const;
   virtual sat_literal_polarity get_sat_literal_polarity() const;
-  virtual expression get_instance(const substitution & sb);
+  virtual expression get_instance(const substitution & sb) const;
   virtual bool is_instance(const expression & exp,
 			   substitution & sb) const;  
   virtual bool check_expression(const signature * sg,
 				search_mode smode = S_CONTEXTUAL) const;
-  virtual expression infer_sorts(); 
+  virtual expression infer_sorts() const; 
   virtual expression expand_expression(const signature * sg,
-				       search_mode smode = S_CONTEXTUAL);
+				       search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(expression_visitor & visitor);
 
   virtual expression clone_expression(expression_factory * other_factory) const;
@@ -853,7 +853,7 @@ public:
   virtual bool equal_to(const expression_node * node) const;
   virtual void out(std::ostream & ostr) const; 
   virtual bool less_than(const expression_node * node) const;
-  virtual expression eliminate_let_binders(substitution && sub);
+  virtual expression eliminate_let_binders(substitution && sub) const;
 };
 
 /** Represents function expression node.  */
@@ -903,15 +903,15 @@ public:
   virtual const expression_vector & get_operands() const;
   virtual sat_variable get_sat_variable() const;
   virtual sat_literal_polarity get_sat_literal_polarity() const;
-  virtual expression get_instance(const substitution & sb);
+  virtual expression get_instance(const substitution & sb) const;
   virtual bool is_instance(const expression & exp,
 			   substitution & sb) const;
 
   virtual bool check_expression(const signature * sg,
 				search_mode smode = S_CONTEXTUAL) const;
-  virtual expression infer_sorts(); 
+  virtual expression infer_sorts() const; 
   virtual expression expand_expression(const signature * sg,
-				       search_mode smode = S_CONTEXTUAL);
+				       search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(expression_visitor & visitor);
 
   virtual expression clone_expression(expression_factory * other_factory) const;
@@ -921,7 +921,7 @@ public:
   virtual bool equal_to(const expression_node * node) const;
   virtual void out(std::ostream & ostr) const; 
   virtual bool less_than(const expression_node * node) const;
-  virtual expression eliminate_let_binders(substitution && sub);
+  virtual expression eliminate_let_binders(substitution && sub) const;
 
   virtual ~function_expression_node();
 };
@@ -973,14 +973,14 @@ public:
   virtual const expression_vector & get_operands() const;
   virtual sat_variable get_sat_variable() const;
   virtual sat_literal_polarity get_sat_literal_polarity() const;
-  virtual expression get_instance(const substitution & sb);
+  virtual expression get_instance(const substitution & sb) const;
   virtual bool is_instance(const expression & exp,
 			   substitution & sb) const;
   virtual bool check_expression(const signature * sg,
 				search_mode smode = S_CONTEXTUAL) const;
-  virtual expression infer_sorts();
+  virtual expression infer_sorts() const;
   virtual expression expand_expression(const signature * sg,
-				       search_mode smode = S_CONTEXTUAL);
+				       search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(expression_visitor & visitor);
     
   virtual expression clone_expression(expression_factory * other_factory) const;
@@ -990,7 +990,7 @@ public:
   virtual bool equal_to(const expression_node * node) const;
   virtual void out(std::ostream & ostr) const; 
   virtual bool less_than(const expression_node * node) const;
-  virtual expression eliminate_let_binders(substitution && sub);    
+  virtual expression eliminate_let_binders(substitution && sub) const;    
 
   virtual ~quantifier_expression_node();
 };
@@ -1039,14 +1039,14 @@ public:
   virtual const expression_vector & get_operands() const;
   virtual sat_variable get_sat_variable() const;
   virtual sat_literal_polarity get_sat_literal_polarity() const;
-  virtual expression get_instance(const substitution & sb);
+  virtual expression get_instance(const substitution & sb) const;
   virtual bool is_instance(const expression & exp,
 			   substitution & sb) const;
   virtual bool check_expression(const signature * sg,
 				search_mode smode = S_CONTEXTUAL) const;
-  virtual expression infer_sorts();
+  virtual expression infer_sorts() const;
   virtual expression expand_expression(const signature * sg,
-				       search_mode smode = S_CONTEXTUAL);
+				       search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(expression_visitor & visitor);
     
   virtual expression clone_expression(expression_factory * other_factory) const;
@@ -1056,7 +1056,7 @@ public:
   virtual bool equal_to(const expression_node * node) const;
   virtual void out(std::ostream & ostr) const; 
   virtual bool less_than(const expression_node * node) const;
-  virtual expression eliminate_let_binders(substitution && sub);    
+  virtual expression eliminate_let_binders(substitution && sub) const;    
 
   virtual ~let_expression_node();
 };
@@ -1092,14 +1092,14 @@ public:
   virtual const expression_vector & get_operands() const;
   virtual sat_variable get_sat_variable() const;
   virtual sat_literal_polarity get_sat_literal_polarity() const;
-  virtual expression get_instance(const substitution & sb);
+  virtual expression get_instance(const substitution & sb) const;
   virtual bool is_instance(const expression & exp,
 			   substitution & sb) const;
   virtual bool check_expression(const signature * sg,
 				search_mode smode = S_CONTEXTUAL) const;
-  virtual expression infer_sorts();
+  virtual expression infer_sorts() const;
   virtual expression expand_expression(const signature * sg,
-				       search_mode smode = S_CONTEXTUAL);
+				       search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(expression_visitor & visitor);
     
   virtual expression clone_expression(expression_factory * other_factory) const;
@@ -1109,7 +1109,7 @@ public:
   virtual bool equal_to(const expression_node * node) const;
   virtual void out(std::ostream & ostr) const; 
   virtual bool less_than(const expression_node * node) const;
-  virtual expression eliminate_let_binders(substitution && sub);
+  virtual expression eliminate_let_binders(substitution && sub) const;
 
 };
 
@@ -1800,7 +1800,7 @@ expression_factory * expression_node::get_factory() const
 }
 
 inline
-bool expression_node::is_formula()
+bool expression_node::is_formula() const
 {
   return infer_sorts()->get_sort() == _factory->get_signature()->get_sort_factory()->BOOL_SORT();
 }
@@ -1824,7 +1824,7 @@ std::string expression_node::to_string() const
 }
 
 inline
-expression expression_node::expand_expression()
+expression expression_node::expand_expression() const
 {
   return this->expand_expression(_factory->get_signature(), S_CONTEXTUAL);
 }
@@ -1982,7 +1982,7 @@ bool expression_node::is_equality() const
 }
 
 inline
-bool expression_node::is_equivalence()
+bool expression_node::is_equivalence() const
 {
   return get_symbol() == function_symbol::EQ && get_operands()[0]->is_formula();
 }
@@ -2229,9 +2229,9 @@ bool undefined_expression_node::less_than(const expression_node * node) const
 
 inline
 expression undefined_expression_node::
-get_instance(const substitution & sb)
+get_instance(const substitution & sb) const
 {
-  return this->shared_from_this();
+  return const_cast<undefined_expression_node*>(this)->shared_from_this();
 }
 
 inline
@@ -2251,23 +2251,23 @@ undefined_expression_node::check_expression(const signature * sg,
 }
 
 inline
-expression undefined_expression_node::infer_sorts()
+expression undefined_expression_node::infer_sorts() const
 {
-  return this->shared_from_this();
+  return const_cast<undefined_expression_node*>(this)->shared_from_this();
 }
 
 inline
 expression undefined_expression_node::
 expand_expression(const signature * sg,
-		  search_mode smode)
+		  search_mode smode) const
 {
-  return this->shared_from_this();
+  return const_cast<undefined_expression_node*>(this)->shared_from_this();
 }
 
 inline
-expression undefined_expression_node::eliminate_let_binders(substitution && sub)
+expression undefined_expression_node::eliminate_let_binders(substitution && sub) const
 {
-  return this->shared_from_this();
+  return const_cast<undefined_expression_node *>(this)->shared_from_this();
 }
 
 inline
@@ -2453,7 +2453,7 @@ bool variable_expression_node::less_than(const expression_node * node) const
   
 inline
 expression variable_expression_node::
-get_instance(const substitution & sb)
+get_instance(const substitution & sb) const
 {
   substitution::const_iterator it = 
     sb.find(_var);
@@ -2468,7 +2468,7 @@ get_instance(const substitution & sb)
 				 it->second->get_sort());
     }
   else
-    return this->shared_from_this();
+    return const_cast<variable_expression_node*>(this)->shared_from_this();
 }
 
 inline
@@ -2480,14 +2480,14 @@ variable_expression_node::check_expression(const signature * sg,
 }
 
 inline
-expression variable_expression_node::infer_sorts()
+expression variable_expression_node::infer_sorts() const
 {
   if(_factory->get_signature()->get_syntax_checking())
-    return this->shared_from_this();
+    return const_cast<variable_expression_node*>(this)->shared_from_this();
 
   if(_sort != _factory->get_signature()->get_sort_factory()->UNDEFINED_SORT()
      && !_sort->has_parameters())
-    return this->shared_from_this();
+    return const_cast<variable_expression_node*>(this)->shared_from_this();
   else
     throw bad_sort_exception("Cannot infer expression (variable) sort", _sort);
 }
@@ -2525,7 +2525,7 @@ variable_expression_node::out(std::ostream & ostr) const
 inline
 expression variable_expression_node::
 expand_expression(const signature * sg,
-		  search_mode smode)
+		  search_mode smode) const
 {
   if(_sort == _factory->get_signature()->get_sort_factory()->UNDEFINED_SORT()
      || _sort->has_parameters())
@@ -2536,7 +2536,7 @@ expand_expression(const signature * sg,
 }
 
 inline
-expression variable_expression_node::eliminate_let_binders(substitution && sub)
+expression variable_expression_node::eliminate_let_binders(substitution && sub) const
 {
   substitution::const_iterator it = sub.find(_var);
   
@@ -2550,7 +2550,7 @@ expression variable_expression_node::eliminate_let_binders(substitution && sub)
 				 it->second->get_sort());
     }
   else
-    return this->shared_from_this();
+    return const_cast<variable_expression_node*>(this)->shared_from_this();
 }
 
 inline
@@ -2730,9 +2730,9 @@ special_constant_expression_node::less_than(const expression_node * node) const
 
 inline
 expression special_constant_expression_node::
-get_instance(const substitution & sb)
+get_instance(const substitution & sb) const
 {
-  return this->shared_from_this();
+  return const_cast<special_constant_expression_node*>(this)->shared_from_this();
 }
 
 inline
@@ -2766,10 +2766,10 @@ special_constant_expression_node::check_expression(const signature * sg,
 }
 
 inline
-expression special_constant_expression_node::infer_sorts()
+expression special_constant_expression_node::infer_sorts() const
 {
   if(_factory->get_signature()->get_syntax_checking())
-    return this->shared_from_this();
+    return const_cast<special_constant_expression_node*>(this)->shared_from_this();
 
   sort sr = _sort;
   if(_factory->get_signature()->check_special_constant(_spec_const, sr))
@@ -2781,7 +2781,7 @@ expression special_constant_expression_node::infer_sorts()
 inline
 expression special_constant_expression_node::
 expand_expression(const signature * sg,
-		  search_mode smode)
+		  search_mode smode) const
 {
 
   sort sr = _sort;
@@ -2794,9 +2794,9 @@ expand_expression(const signature * sg,
 
 
 inline
-expression special_constant_expression_node::eliminate_let_binders(substitution && sub)
+expression special_constant_expression_node::eliminate_let_binders(substitution && sub) const
 {
-  return this->shared_from_this();
+  return const_cast<special_constant_expression_node*>(this)->shared_from_this();
 }
 
 inline
@@ -3103,7 +3103,7 @@ bool quantifier_expression_node::less_than(const expression_node * node) const
 }
 
 inline
-expression quantifier_expression_node::eliminate_let_binders(substitution && sub)
+expression quantifier_expression_node::eliminate_let_binders(substitution && sub) const
 {
   return _factory->create_expression(_quantifier, *_vars, 
 				     _expr->eliminate_let_binders(std::move(sub)));
@@ -3379,9 +3379,9 @@ sat_literal_expression_node::equal_to(const expression_node * node) const
   
 inline
 expression sat_literal_expression_node::
-get_instance(const substitution & sb)
+get_instance(const substitution & sb) const
 {
-  return this->shared_from_this();
+  return const_cast<sat_literal_expression_node*>(this)->shared_from_this();
 }
 
 inline
@@ -3393,9 +3393,9 @@ sat_literal_expression_node::check_expression(const signature * sg,
 }
 
 inline
-expression sat_literal_expression_node::infer_sorts()
+expression sat_literal_expression_node::infer_sorts() const
 {
-  return this->shared_from_this();
+  return const_cast<sat_literal_expression_node*>(this)->shared_from_this();
 }
 
 
@@ -3428,15 +3428,15 @@ bool sat_literal_expression_node::less_than(const expression_node * node) const
 inline
 expression sat_literal_expression_node::
 expand_expression(const signature * sg,
-		  search_mode smode)
+		  search_mode smode) const
 {
-  return this->shared_from_this();
+  return const_cast<sat_literal_expression_node*>(this)->shared_from_this();
 }
 
 inline
-expression sat_literal_expression_node::eliminate_let_binders(substitution && sub)
+expression sat_literal_expression_node::eliminate_let_binders(substitution && sub) const
 {
-  return this->shared_from_this();
+  return const_cast<sat_literal_expression_node*>(this)->shared_from_this();
 }
 
 

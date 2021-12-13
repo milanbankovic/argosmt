@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2015 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2015,2021 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ extended_boolean opposite_value(extended_boolean eb)
 #define UNDEFINED_TRAIL_LEVEL ((unsigned)(-1))
 #define UNDEFINED_TRAIL_INDEX ((unsigned)(-1))
 
-class theory;
+class theory_solver;
 class solver;
 
 class trail {
@@ -47,11 +47,11 @@ private:
   
   struct on_push {
     trail & _tr;
-    theory * _source_theory;
+    theory_solver * _source_theory_solver;
 
-    on_push(trail & tr, theory * st)
+    on_push(trail & tr, theory_solver * st)
       :_tr(tr),
-       _source_theory(st)
+       _source_theory_solver(st)
     {}
    
     void operator () (const expression & l) const
@@ -59,7 +59,7 @@ private:
       assert(_tr.is_undefined(l));
       trail_data * l_data = _tr._data.get_data(l);  
       l_data->_pair_data->_value = l_data->_positive ? EB_TRUE : EB_FALSE;
-      l_data->_pair_data->_source_theory = _source_theory;
+      l_data->_pair_data->_source_theory_solver = _source_theory_solver;
       l_data->_pair_data->_trail_index = _tr.size() - 1;
       l_data->_pair_data->_trail_level = _tr.current_level();
     }
@@ -75,7 +75,7 @@ private:
     {
       trail_data * l_data = _tr._data.get_data(l);
       l_data->_pair_data->_value = EB_UNDEFINED;
-      l_data->_pair_data->_source_theory = 0;
+      l_data->_pair_data->_source_theory_solver = 0;
       l_data->_pair_data->_trail_level = UNDEFINED_TRAIL_LEVEL;
       l_data->_pair_data->_trail_index = UNDEFINED_TRAIL_INDEX;
     }
@@ -84,12 +84,12 @@ private:
   struct trail_data : public expression_data {
     struct pair_data {
       extended_boolean _value;
-      theory * _source_theory;
+      theory_solver * _source_theory_solver;
       unsigned _trail_level;
       unsigned _trail_index;       
       pair_data()
 	:_value(EB_UNDEFINED), 
-	 _source_theory(0),
+	 _source_theory_solver(0),
 	 _trail_level(UNDEFINED_TRAIL_LEVEL), 
 	 _trail_index(UNDEFINED_TRAIL_INDEX)
       {}
@@ -153,10 +153,10 @@ public:
     return get_value(l) == EB_FALSE;
   }
   
-  theory * get_source_theory(const expression & l) const
+  theory_solver * get_source_theory_solver(const expression & l) const
   {
     trail_data * l_data = _data.get_data(l);
-    return l_data->_pair_data->_source_theory;
+    return l_data->_pair_data->_source_theory_solver;
   }
   
   unsigned get_trail_level(const expression & l) const
@@ -187,14 +187,14 @@ public:
     return _stack[i];
   }
   
-  void push(const expression & l, theory * source_theory)
+  void push(const expression & l, theory_solver * source_theory_solver)
   {
-    _stack.push(l, on_push(*this, source_theory));
+    _stack.push(l, on_push(*this, source_theory_solver));
   }
 
-  void push(expression && l, theory * source_theory)
+  void push(expression && l, theory_solver * source_theory_solver)
   {
-    _stack.push(std::move(l), on_push(*this, source_theory));
+    _stack.push(std::move(l), on_push(*this, source_theory_solver));
   }
 
   

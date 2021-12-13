@@ -43,8 +43,8 @@ private:
 
   std::ostream & _ostr;
 
-  std::vector<unsigned> _theory_count_conflict;
-  std::vector<unsigned> _theory_count_propagate;
+  std::vector<unsigned> _theory_solver_count_conflict;
+  std::vector<unsigned> _theory_solver_count_propagate;
 
   bool _inited;
 
@@ -54,8 +54,8 @@ private:
 
   void init()
   {
-    _theory_count_conflict.resize(_solver.get_theories().size(), 0);
-    _theory_count_propagate.resize(_solver.get_theories().size(), 0);
+    _theory_solver_count_conflict.resize(_solver.get_theory_solvers().size(), 0);
+    _theory_solver_count_propagate.resize(_solver.get_theory_solvers().size(), 0);
     _inited = true;
   }
 
@@ -99,25 +99,26 @@ public:
   }
 
   virtual void propagate_applied(const expression & l, 
-				const theory * source_theory)
-  { 
+				const theory_solver * source_ts)
+  {
     ++_count_propagate;
     if(_count_propagate % (_period * 100) == 0)
       _ostr << "p" << std::flush;
 
     if(!_inited)
       init();
-    _theory_count_propagate[source_theory->get_index()]++;
+    _theory_solver_count_propagate[source_ts->get_index()]++;
   }
 
-  virtual void conflict_applied(const explanation & conflicting, theory * conflict_theory)
-  {    
+  virtual void conflict_applied(const explanation & conflicting,
+				const theory_solver * conflict_ts)
+  {
     ++_count_conflict;
     _cum_cflt_expl_size += conflicting.size();
     
     if(!_inited)
       init();
-    _theory_count_conflict[conflict_theory->get_index()]++;
+    _theory_solver_count_conflict[conflict_ts->get_index()]++;
   }
 
   virtual void explain_applied(const expression & l, 
@@ -197,19 +198,19 @@ public:
     _ostr << "------------------------------------------------------------------" << std::endl;
   }
 
-  void theory_report(unsigned index)
+  void theory_solver_report(unsigned index)
   {    
-    theory * th = _solver.get_theories()[index];
+    theory_solver * th = _solver.get_theory_solvers()[index];
     _ostr << "------------------------------------------------------------------" << std::endl;
-    _ostr << "Theory: " << th->get_name() << std::endl;
-    _ostr << "Propagations: " << _theory_count_propagate[index];
+    _ostr << "Theory_Solver: " << th->get_name() << std::endl;
+    _ostr << "Propagations: " << _theory_solver_count_propagate[index];
     if(_count_propagate > 0)
-      _ostr << " (" << (0.0 + _theory_count_propagate[index]) / _count_propagate << ")" << std::endl;
+      _ostr << " (" << (0.0 + _theory_solver_count_propagate[index]) / _count_propagate << ")" << std::endl;
     else
       _ostr << std::endl;
-    _ostr << "Conflicts: " << _theory_count_conflict[index];
+    _ostr << "Conflicts: " << _theory_solver_count_conflict[index];
     if(_count_conflict > 0)
-      _ostr << " (" << (0.0 + _theory_count_conflict[index]) / _count_conflict << ")" << std::endl;
+      _ostr << " (" << (0.0 + _theory_solver_count_conflict[index]) / _count_conflict << ")" << std::endl;
     else
       _ostr << std::endl;
     _ostr << "------------------------------------------------------------------" << std::endl;
@@ -219,8 +220,8 @@ public:
   {
     if(!_inited)
       init();
-    for(unsigned i = 0; i < _solver.get_theories().size(); i++)
-      theory_report(i);
+    for(unsigned i = 0; i < _solver.get_theory_solvers().size(); i++)
+      theory_solver_report(i);
   }
 
   void get_statistics(attribute_set & attr)

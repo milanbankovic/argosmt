@@ -188,6 +188,16 @@ public:
   virtual bool check_expression(const expression & exp);
 };
 
+/** UF logic. */
+class uf_logic_declaration : public logic_declaration {
+private:
+  core_theory_declaration  _core;
+public:
+  virtual signature * create_signature(bool syntax_checking = true);
+  virtual bool check_expression(const expression & exp);
+};
+
+
 /** QF_UF logic. */
 class qfuf_logic_declaration : public logic_declaration {
 private:

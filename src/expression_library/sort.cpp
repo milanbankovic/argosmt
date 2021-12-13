@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2015 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2015,2021 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -139,10 +139,10 @@ const sort_parameter_set & symbol_sort_node::get_parameters()
   return *_parameters;
 }
 
-sort symbol_sort_node::get_instance(const instantiation & in)
+sort symbol_sort_node::get_instance(const instantiation & in) const
 {
   if(_operands->empty())
-    return this->shared_from_this();
+    return const_cast<symbol_sort_node*>(this)->shared_from_this();
 
   sort_vector ops;
   
@@ -178,7 +178,7 @@ bool symbol_sort_node::is_instance(const sort & sr,
 }
   
 sort symbol_sort_node::expand_sort(const signature * sg, 
-				   search_mode smode)
+				   search_mode smode) const
 {
   sort_vector expanded_operands;
   for(sort_vector::const_iterator it = _operands->begin(), 

@@ -42,7 +42,7 @@ public:
     return _count_conflicts >= _should_restart;
   }
 
-  virtual void conflict_applied(const explanation & conflicting, theory * conflict_theory)
+  virtual void conflict_applied(const explanation & conflicting, const theory_solver * /* unnamed */)
   {
     _count_conflicts++;
   }

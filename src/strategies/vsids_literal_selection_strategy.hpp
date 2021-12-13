@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2014 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2014,2021 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -191,7 +191,7 @@ public:
   }
 
 
-  virtual void conflict_applied(const explanation & conflicting, theory * conflict_theory)
+  virtual void conflict_applied(const explanation & conflicting, const theory_solver * /* unnamed */)
   {
     _bump_amount *= _decay_factor;
     bump_literals(conflicting);

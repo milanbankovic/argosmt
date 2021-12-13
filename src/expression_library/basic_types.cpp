@@ -19,9 +19,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "basic_types.hpp"
 
-#ifndef _PARALLEL_PORTFOLIO
 object_factory<special_constant::data> * special_constant::_factory = 0;
-#endif
 
 const special_constant special_constant::UNDEFINED = 
   special_constant(T_UNDEF, "");
@@ -94,12 +92,7 @@ std::string convert_hex_to_binary(const std::string & str)
 
 special_constant::special_constant(type tp, unsigned long value)
 {
-#ifndef _PARALLEL_PORTFOLIO
   data d(tp, "");
-#else
-  data *pd = new data(tp, "");
-  data & d = *pd;
-#endif
 
   std::ostringstream ostr;
   switch(d._type)
@@ -121,21 +114,12 @@ special_constant::special_constant(type tp, unsigned long value)
       break;
     }
   d.calculate_hash();
-#ifndef _PARALLEL_PORTFOLIO
   _data = get_factory().add_object(std::move(d));
-#else
-  _data.reset(pd);
-#endif
 }
 
 special_constant::special_constant(type tp, unsigned value)
 {
-#ifndef _PARALLEL_PORTFOLIO
   data d(tp, "");
-#else
-  data *pd = new data(tp, "");
-  data & d = *pd;
-#endif
 
   std::ostringstream ostr;
   switch(d._type)
@@ -157,23 +141,14 @@ special_constant::special_constant(type tp, unsigned value)
       break;
     }
   d.calculate_hash();
-#ifndef _PARALLEL_PORTFOLIO
   _data = get_factory().add_object(std::move(d));
-#else
-  _data.reset(pd);
-#endif
 }
 
 special_constant::special_constant(type tp, int value)
 {
   value = abs(value); // ensure that the value is non-negative
   
-#ifndef _PARALLEL_PORTFOLIO
   data d(tp, "");
-#else
-  data *pd = new data(tp, "");
-  data & d = *pd;
-#endif
 
   std::ostringstream ostr;
   switch(d._type)
@@ -195,11 +170,7 @@ special_constant::special_constant(type tp, int value)
       break;
     }
   d.calculate_hash();
-#ifndef _PARALLEL_PORTFOLIO
   _data = get_factory().add_object(std::move(d));
-#else
-  _data.reset(pd);
-#endif
 }
 
 
@@ -218,12 +189,7 @@ void remove_trailing_zeros(std::string & str)
 special_constant::special_constant(type tp, long double value,
 				   unsigned precision)
 {
-#ifndef _PARALLEL_PORTFOLIO
   data d(tp, "");
-#else
-  data *pd = new data(tp, "");
-  data & d = *pd;
-#endif
     
   if(d._type != T_DECIMAL)
     throw special_constant_initialization_exception("Special constant initialized with a bad value", d._type);
@@ -235,22 +201,13 @@ special_constant::special_constant(type tp, long double value,
   remove_trailing_zeros(d._value);
   d.calculate_hash();
  
-#ifndef _PARALLEL_PORTFOLIO
   _data = get_factory().add_object(std::move(d));
-#else
-  _data.reset(pd);
-#endif
 }
 
 special_constant::special_constant(type tp, double value,
 				   unsigned precision)
 {
-#ifndef _PARALLEL_PORTFOLIO
   data d(tp, "");
-#else
-  data *pd = new data(tp, "");
-  data & d = *pd;
-#endif
     
   if(d._type != T_DECIMAL)
     throw special_constant_initialization_exception("Special constant initialized with a bad value", d._type);
@@ -262,23 +219,14 @@ special_constant::special_constant(type tp, double value,
   remove_trailing_zeros(d._value);
   d.calculate_hash();
  
-#ifndef _PARALLEL_PORTFOLIO
   _data = get_factory().add_object(std::move(d));
-#else
-  _data.reset(pd);
-#endif
 }
 
 
 #ifdef _USE_GMP
 special_constant::special_constant(type tp, const mpz_class & value)
 {   
-#ifndef _PARALLEL_PORTFOLIO
   data d(tp, "");
-#else
-  data *pd = new data(tp, "");
-  data & d = *pd;
-#endif
 
   switch(d._type)
     {
@@ -297,23 +245,14 @@ special_constant::special_constant(type tp, const mpz_class & value)
       break;
     }
   d.calculate_hash();
-#ifndef _PARALLEL_PORTFOLIO
   _data = get_factory().add_object(std::move(d));
-#else
-  _data.reset(pd);
-#endif
 }
 
 
 special_constant::special_constant(type tp, const mpf_class & value,
 				   unsigned precision)
 {
-#ifndef _PARALLEL_PORTFOLIO
   data d(tp, "");
-#else
-  data *pd = new data(tp, "");
-  data & d = *pd;
-#endif
 
   if(d._type != T_DECIMAL)
     throw special_constant_initialization_exception("Special constant initialized with a bad value", 
@@ -325,11 +264,7 @@ special_constant::special_constant(type tp, const mpf_class & value,
   d._value = ostr.str();
   remove_trailing_zeros(d._value);
   d.calculate_hash();
-#ifndef _PARALLEL_PORTFOLIO
   _data = get_factory().add_object(std::move(d));
-#else
-  _data.reset(pd);
-#endif
 }
 
 
@@ -337,12 +272,7 @@ special_constant::special_constant(type tp, const mpq_class & value,
 				   unsigned precision)
 {          
 
-#ifndef _PARALLEL_PORTFOLIO
   data d(tp, "");
-#else
-  data *pd = new data(tp, "");
-  data & d = *pd;
-#endif
 
   if(d._type == T_DECIMAL)
     {
@@ -367,11 +297,7 @@ special_constant::special_constant(type tp, const mpq_class & value,
   else
     throw special_constant_initialization_exception("Special constant initialized with a bad value", d._type);
   d.calculate_hash();
-#ifndef _PARALLEL_PORTFOLIO
   _data = get_factory().add_object(std::move(d));
-#else
-  _data.reset(pd);
-#endif
 }
 
 #endif

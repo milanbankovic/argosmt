@@ -51,6 +51,7 @@ smtlib_api::smtlib_api()
   register_logic("QF_NIA", new qfnia_logic_declaration());
   register_logic("QF_NRA", new qfnra_logic_declaration());
   register_logic("QF_RDL", new qfrdl_logic_declaration());
+  register_logic("UF", new uf_logic_declaration());
   register_logic("QF_UF", new qfuf_logic_declaration());
   register_logic("QF_UFBV", new qfufbv_logic_declaration());
   register_logic("QF_UFIDL", new qfufidl_logic_declaration());

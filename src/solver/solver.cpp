@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2017 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2017,2021 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,257 +21,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "solver_observer.hpp"
 #include <algorithm>
 #include "logging_solver_observer.hpp"
-#include "conditional_tbb_wrapper.hpp"
 #include "cmd_line_parser.hpp"
 
-#ifdef _PARALLEL_PORTFOLIO
-bool solving_cancelled = false;
-
-
-void solver::check_and_export_shared_clause(clause * cl)
+expression strip_double_negations(const expression & l)
 {
-  if(cl->size() <= _share_size_limit && (_learnt_clauses.size() < 2 || *cl != *_learnt_clauses[_learnt_clauses.size() - 2]))
-    {
-      //std::cout << "EXPORTING CLAUSE: " << _solver_index << " : " << *cl << std::endl;
-      cl->set_locked(true);
-      _shared_clauses.push_back(cl);      
-    }
+  if(l->is_not() && l->get_operands()[0]->is_not())
+    return strip_double_negations(l->get_operands()[0]->get_operands()[0]);
+  else
+    return l;
 }
-
-void solver::import_shared_clauses()
-{
-  for(unsigned i = 0; i < _solvers.size(); i++)
-    {
-      if(i == _solver_index)
-	continue;
-
-      if(_solvers[i] == 0)
-	continue;
-      
-      std::vector<clause *> & i_shared = _solvers[i]->_shared_clauses;
-      unsigned size = i_shared.size();
-      unsigned & i_index = _shared_indices[i];
-      while(i_index < size)
-	{
-	  clause * orig_cl = i_shared[i_index];
-	  clause * cl = new clause();
-	  cl->reserve(orig_cl->size());
-	  for(unsigned j = 0; j < orig_cl->size(); j++)
-	    {
-	      expression clj = (*orig_cl)[j]->clone_expression(_factory);
-	      //	      if(!has_expression_data(clj) || !has_literal_data(clj))
-	      //	std::cout << "INTRODUCING CROSS: " << clj << std::endl;
-	      apply_introduce_literal(clj);
-	      cl->push_back(std::move(clj));
-	    }
-	  apply_theory_lemma(cl);
-	  _count_imports++;
-	  //std::cout << "IMPORTING CLAUSE: " << _solver_index << " : " << i << " : " << *cl << std::endl;
-	  i_index++;
-	}
-    }
-}
-#endif
-
-
-class canonization_visitor : public expression_visitor {
-private:
-  solver & _solver;
-  const std::vector<theory *> & _theories;
-  expression_vector _stack;
-
-  expression apply_canonization(const expression & e)
-  {
-    expression temp = e;
-    for(unsigned i = 0; i < _theories.size(); i++)
-      temp = _theories[i]->canonize_expression(temp);
-    return temp;
-  }
-
-public:
-  canonization_visitor(solver & sl)
-    :_solver(sl),
-     _theories(sl.get_theories())
-  {}
-  
-  expression get_canonized_expression()
-  {
-    assert(_stack.size() == 1);
-    return _stack[0];
-  }
-        
-  virtual void 
-  visit_variable_expression_node(const expression & e)
-  {
-    _stack.push_back(apply_canonization(e));
-  }
-  
-  virtual void
-  visit_special_constant_expression_node(const expression & e)
-  {
-    _stack.push_back(apply_canonization(e));
-  }
-  
-  virtual void visit_function_expression_node_postorder(const expression & e)
-  {
-    unsigned n = e->get_operands().size();
-    expression_vector ops(n);
-    std::copy(_stack.end() - n, _stack.end(), ops.begin());
-    _stack.resize(_stack.size() - n);
-    
-    expression temp = _solver.get_factory()->create_expression(e->get_symbol(), std::move(ops));
-    
-    _stack.push_back(apply_canonization(temp));
-    
-  }
-  
-  virtual void visit_sat_literal_expression_node(const expression & e)
-  {
-    _stack.push_back(apply_canonization(e));
-  }
-};
-
-class data_init_visitor : public expression_visitor {
-private:
-  solver & _solver;
-  const std::vector<theory *> & _theories;
-
-  void ask_theories(const expression & e)
-  {
-    common_data * e_common = _solver.get_common_data(e);
-
-    //std::cout << "INITING: " << e << std::endl;
-    
-    // Equalities and disequalities have owner only if not mixed
-    if(e->is_equality() || e->is_disequality())
-      {
-	const expression & le = e->get_operands()[0];
-	const expression & re = e->get_operands()[1];
-	common_data * le_common = _solver.get_common_data(le);
-	common_data * re_common = _solver.get_common_data(re);
-	if(le_common->get_owner() != re_common->get_owner())
-	  {
-
-	    if(le_common->get_owner()->get_index() >
-	       re_common->get_owner()->get_index())
-	      le_common->set_shared(true);
-	    else
-	      re_common->set_shared(true);	  
-	    
-	    //le_common->set_shared(true);
-	    //re_common->set_shared(true);
-	    e_common->set_owner(nullptr);
-	  }
-	else
-	  {
-	    e_common->set_owner(le_common->get_owner());
-	  }	
-	return;
-      }
-
-    // Negations ~p, ~p(e1,...,en)
-    if(e->is_not())
-      {
-	const expression & op = e->get_operands()[0];
-	common_data * op_common = _solver.get_common_data(op);
-	e_common->set_owner(op_common->get_owner());
-	return;
-      }
-
-    
-    // Other terms should always have owner
-    for(unsigned i = 0; i < _theories.size(); i++)
-      {
-	if(_theories[i]->is_owned_expression(e))
-	  {
-	    e_common->set_owner(_theories[i]);
-	    const expression_vector & ops = e->get_operands();
-	    for(unsigned j = 0; j < ops.size(); j++)
-	      {
-		common_data * ops_common = _solver.get_common_data(ops[j]);
-		if(ops_common->get_owner() != _theories[i])
-		  ops_common->set_shared(true);
-	      }
-	    break;
-	  }
-      }    
-  }
-  
-  void set_expression_data(const expression & e)
-  {  
-    if(e->has_expression_data())
-      return;
-
-    e->set_expression_data(new argosmt_expression_data(_solver.extractor_counter()));
-    _solver.set_common_data(e, new common_data());
-    ask_theories(e);
-  }
-  
-public:
-  data_init_visitor(solver & sl)
-    :_solver(sl),
-     _theories(sl.get_theories())
-  {}
-  
-  virtual void 
-  visit_variable_expression_node(const expression & e)
-  {
-    set_expression_data(e);
-  }
-  
-  virtual void
-  visit_special_constant_expression_node(const expression & e)
-  {
-    set_expression_data(e);
-  }
-    
-  virtual void 
-  visit_function_expression_node_postorder(const expression & e)
-  {
-    set_expression_data(e);
-  }
-  
-  virtual void 
-  visit_sat_literal_expression_node(const expression & e)
-  {
-    set_expression_data(e);
-  }
-};
-
-
-class data_clear_visitor : public expression_visitor {
-private:
-  void clear_data(const expression & e)
-  {
-    delete e->get_expression_data();
-    e->set_expression_data(0);
-  }
-public:
-  
-  virtual void 
-  visit_variable_expression_node(const expression & e)
-  {
-    clear_data(e);
-  }
-  
-  virtual void
-  visit_special_constant_expression_node(const expression & e)
-  {
-    clear_data(e);
-  }
-  
-  virtual void 
-  visit_function_expression_node_preorder(const expression & e)
-  {
-    clear_data(e);
-  }
-  
-  virtual void 
-  visit_sat_literal_expression_node(const expression & e)
-  {
-    clear_data(e);
-  }
-};
 
 void solver::add_literals(const expression & l_pos, const expression & l_neg)
 {
@@ -304,46 +62,127 @@ void solver::init_expression_data(const expression & e)
 {    
   if(e->has_expression_data())
     return;
+
+  if(e->is_function() && !e->get_operands().empty())
+    {
+      for(expression_vector::const_iterator it = e->get_operands().begin(),
+	    it_end = e->get_operands().end(); it != it_end; ++it)
+	{
+	  init_expression_data(*it);
+	}
+    }
+
+  e->set_expression_data(new argosmt_expression_data(_extractor_counter));
+  set_common_data(e, new common_data());
   
-  data_init_visitor visitor(*this);
-  e->accept_visitor(visitor);
+  common_data * e_common = get_common_data(e);
+
+  //std::cout << "INITING: " << e << std::endl;
+    
+  // Equalities and disequalities have owner only if not mixed
+  if(e->is_equality() || e->is_disequality())
+    {
+      const expression & le = e->get_operands()[0];
+      const expression & re = e->get_operands()[1];
+      common_data * le_common = get_common_data(le);
+      common_data * re_common = get_common_data(re);
+      if(le_common->get_owner() != re_common->get_owner())
+	{
+	  if(le_common->get_owner()->get_index() >
+	     re_common->get_owner()->get_index())
+	    le_common->set_shared(true);
+	  else
+	    re_common->set_shared(true);	  
+	    
+	  //le_common->set_shared(true);
+	  //re_common->set_shared(true);
+	  e_common->set_owner(nullptr);
+	}
+      else
+	{
+	  e_common->set_owner(le_common->get_owner());
+	}	
+    }
+  // Negations ~p, ~p(e1,...,en)
+  else if(e->is_not())
+    {
+      const expression & op = e->get_operands()[0];
+      common_data * op_common = get_common_data(op);
+      e_common->set_owner(op_common->get_owner());
+    }
+  // Quantifiers do not have owner
+  else if(e->is_quantifier())
+    {
+      e_common->set_owner(nullptr);
+    }
+  else
+    {    
+      // Other terms should always have owner
+      for(unsigned i = 0; i < _theory_solvers.size(); i++)
+	{
+	  if(_theory_solvers[i]->is_owned_expression(e))
+	    {
+	      e_common->set_owner(_theory_solvers[i]);
+	      const expression_vector & ops = e->get_operands();
+	      for(unsigned j = 0; j < ops.size(); j++)
+		{
+		  common_data * ops_common = get_common_data(ops[j]);
+		  if(ops_common->get_owner() != _theory_solvers[i])
+		    ops_common->set_shared(true);
+		}
+	      break;
+	    }
+	}
+    }
 }
 
 void solver::clear_expression_data(const expression & e)
 {
-  data_clear_visitor visitor;
-  e->accept_visitor(visitor);
+  delete e->get_expression_data();
+  e->set_expression_data(nullptr);
+
+  if(e->is_function() && !e->get_operands().empty())
+    {
+      for(expression_vector::const_iterator it = e->get_operands().begin(),
+	    it_end = e->get_operands().end(); it != it_end; ++it)
+	{
+	  clear_expression_data(*it);
+	}
+    }
 }
 
 void solver::introduce_literal_without_sending(expression & l)
 {
   expression l_pos;
   expression l_neg;
-  
+
   l = canonize_literal(l);
 
   init_expression_data(l);
 
   if(!has_literal_data(l))
     {
-      //std::cout << "USO: " << l << std::endl;
-
-      get_literal_pair(l, l_pos, l_neg);      
-      
-      //std::cout << "PROSO: " << l_pos << ", " << l_neg << std::endl;
-      
-      init_expression_data(l_pos);
-
-
-      
+      get_literal_pair(l, l_pos, l_neg);                 
+      init_expression_data(l_pos);      
       init_expression_data(l_neg);
-
-      add_literals(l_pos, l_neg);
-      
+      add_literals(l_pos, l_neg);      
       if(l_pos->is_equality())
 	cache_equality(l_pos->get_operands()[0], 
 		       l_pos->get_operands()[1], 
 		       l_pos);
+      if(l_pos->is_quantifier())
+	{
+	  const sorted_variable_vector & svars = l_pos->get_quantified_variables();
+	  for(const sorted_variable & svar : svars)
+	    {
+	      expression sc = _formula_transformer->get_sort_constant(svar.get_sort());
+	      if(!sc->has_expression_data())
+		{
+		  init_expression_data(sc);
+		  get_congruence_closure_theory_solver()->add_expression(sc);
+		}
+	    }	  
+	}
     }
 }
 
@@ -351,14 +190,17 @@ void solver::introduce_literal_without_sending(expression & l)
 void solver::send_literals(const expression & l_pos, 
 			   const expression & l_neg)
 {
-  if(!get_literal_data(l_pos)->get_observing_theories().empty())
+  if(get_literal_data(l_pos)->is_observed())
     return;
   
   for(unsigned i = 0; i < _observers.size(); i++)
     _observers[i]->literal_introduced(l_pos, l_neg);
   
-  for(unsigned i = 0; i < _theories.size(); i++)
-    _theories[i]->add_literal(l_pos, l_neg);
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
+    _theory_solvers[i]->add_literal(l_pos, l_neg);
+
+  for(unsigned i = 0; i < _q_processors.size(); i++)
+    _q_processors[i]->add_literal(l_pos, l_neg);
 }
 
 void solver::add_initial_clause(clause * cl)
@@ -408,14 +250,73 @@ unsigned solver::get_first_unlocked_index()
   return first_unlocked;
 }
 
+expression solver::canonize_literal_rec(const expression & e)
+{
+  expression ep;
+  if(e->is_function() && !e->get_operands().empty())
+    {
+      expression_vector c_ops;
+      c_ops.reserve(e->get_operands().size());
+      for(expression_vector::const_iterator it = e->get_operands().begin(),
+	    it_end = e->get_operands().end(); it != it_end; ++it)
+	{
+	  c_ops.push_back(canonize_literal_rec(*it));
+	}
+      ep = _factory->create_expression(e->get_symbol(), std::move(c_ops));
+    }
+  else
+    ep = e;
+  
+  if(ep->is_quantifier())
+    {
+      sorted_variable_vector svars;
+      quantifier quant = ep->get_quantifier();
+      expression op = ep;
+      do {
+	const sorted_variable_vector & op_svars = op->get_quantified_variables();
+	std::copy(op_svars.begin(), op_svars.end(), std::back_inserter(svars));
+	op = op->get_subexpression();
+      } while(op->is_quantifier() && op->get_quantifier() == quant);
+      std::sort(svars.begin(), svars.end());
+      return _factory->create_expression(quant, svars, strip_double_negations(op));
+    }
+
+  // ~forall x.P(x) <=> exists x.~P(x)
+  // ~exists x.P(x) <=> forall x.~P(x)
+  if(ep->is_not() && ep->get_operands()[0]->is_quantifier())
+    {
+      auto opposite_quant = [] (quantifier quant)
+			    {
+			      switch(quant)
+				{
+				case Q_FORALL:
+				  return Q_EXISTS;
+				case Q_EXISTS:
+				  return Q_FORALL;
+				default:
+				  return Q_UNDEFINED;
+				}
+			    };
+      return _factory->create_expression(opposite_quant(ep->get_operands()[0]->get_quantifier()),
+					 ep->get_operands()[0]->get_quantified_variables(),
+					 strip_double_negations(_factory->
+								create_expression(function_symbol::NOT,
+										  ep->get_operands()[0]->
+										  get_subexpression())));      
+    }
+
+  
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
+    ep = _theory_solvers[i]->canonize_expression(ep);
+  return ep;
+}
+
 expression solver::canonize_literal(const expression & e)
 {
   if(e->has_expression_data())
     return e;
-  
-  canonization_visitor visitor(*this);
-  e->accept_visitor(visitor);
-  return visitor.get_canonized_expression();
+
+  return canonize_literal_rec(e);
 }
 
 
@@ -437,6 +338,27 @@ void solver::get_literal_pair(const expression & l,
       l_pos = _factory->create_expression(function_symbol::EQ,
 					  l->get_operands()[0], 
 					  l->get_operands()[1]);
+    }
+  else if(l->is_quantifier())
+    {
+      if(l->get_quantifier() == Q_FORALL)
+	{
+	  l_pos = l;
+	  l_neg = _factory->create_expression(Q_EXISTS,
+					      l->get_quantified_variables(),
+					      strip_double_negations(_factory->
+								     create_expression(function_symbol::NOT,
+										       l->get_subexpression())));
+	}
+      else // l->get_quantifier() == Q_EXISTS
+	{
+	  l_neg = l;
+	  l_pos = _factory->create_expression(Q_FORALL,
+					      l->get_quantified_variables(),
+					      strip_double_negations(_factory->
+								     create_expression(function_symbol::NOT,
+										       l->get_subexpression())));
+	}
     }
   else
     {
@@ -507,31 +429,30 @@ bool solver::apply_introduce_shared_equality(const expression & le,
     }
 }
 
-expression strip_double_negations(const expression & l)
-{
-  if(l->is_not() && l->get_operands()[0]->is_not())
-    return strip_double_negations(l->get_operands()[0]->get_operands()[0]);
-  else
-    return l;
-}
-
 void solver::initialize_solver()
 {
   // Traversing initial clauses, canonizing and introducing literals
   // Counting literal occurrences in initial clauses
   for(unsigned i = 0; i < _initial_clauses.size(); i++)
     {
+      unsigned k = 0;
+      std::unordered_set<expression> cache;
       for(unsigned j = 0; j < _initial_clauses[i]->size(); j++)
 	{
 	  expression & l = (*_initial_clauses[i])[j];
 	  l = strip_double_negations(l);
 	  introduce_literal_without_sending(l);
+	  if(cache.find(l) != cache.end())
+	    continue;
+	  cache.insert(l);
 	  literal_data * l_data = get_literal_data(l);
 	  l_data->increment_occurrence_counter();
+	  (*_initial_clauses[i])[k++] = l;
 	}
+      _initial_clauses[i]->resize(k);      
     }
 
-  // Notifying observers and theories about the introduced literals
+  // Notifying observers and theory_solvers about the introduced literals
   for(unsigned i = 0; i < _literals.size(); i+=2)
     {      
       send_literals(_literals[i], _literals[i + 1]);
@@ -579,9 +500,12 @@ void solver::apply_decide(const expression & l)
  
   //  std::cout << "DECIDE: " << l << " level: " << _trail.current_level() << std::endl;
  
-  for(unsigned i = 0; i < _theories.size(); i++)
-    _theories[i]->new_level();
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
+    _theory_solvers[i]->new_level();
 
+  for(unsigned i = 0; i < _q_processors.size(); i++)
+    _q_processors[i]->new_level();
+  
   //std::cerr << get_literal_data(l)->get_positive() << ":" << get_literal_data(l)->is_positive() << std::endl;
 
   _trail.push(l, 0);
@@ -589,39 +513,28 @@ void solver::apply_decide(const expression & l)
   
   for(unsigned i = 0; i < _observers.size(); i++)
     _observers[i]->decide_applied(l);
-
-  const std::vector<theory *> & l_theories = 
-    get_literal_data(l)->get_observing_theories();
-  
-  for(unsigned i = 0; i < l_theories.size(); i++)
-    l_theories[i]->assert_literal(l);
 }
 
-void solver::apply_propagate(const expression & l, theory * source_theory)
+void solver::apply_propagate(const expression & l, theory_solver * source_ts)
 {
   if(_conflict_set.is_conflict())
     return;
 
   assert(_trail.is_undefined(l));
 
-  _trail.push(l, source_theory);
+  _trail.push(l, source_ts);
   _state_changed = true; 
   
   for(unsigned i = 0; i < _observers.size(); i++)
-    _observers[i]->propagate_applied(l, source_theory);
-      
-  const std::vector<theory *> & l_theories = get_literal_data(l)->get_observing_theories();
-  
-  for(unsigned i = 0; i < l_theories.size(); i++)
-    l_theories[i]->assert_literal(l);
+    _observers[i]->propagate_applied(l, source_ts);      
 }
 
-void solver::apply_conflict(const explanation & conflicting, theory * conflict_theory)
+void solver::apply_conflict(const explanation & conflicting, theory_solver * conflict_ts)
 {
   if(_conflict_set.is_conflict())
     return;
 
-  //  std::cout << "Conflicting: " << conflict_theory->get_name() << std::endl;
+  //  std::cout << "Conflicting: " << conflict_ts->get_name() << std::endl;
   //for(unsigned i = 0; i < conflicting.size(); i++)
   // std::cout << conflicting[i] << " , ";
   //std::cout << std::endl;
@@ -631,9 +544,9 @@ void solver::apply_conflict(const explanation & conflicting, theory * conflict_t
   _conflict_set.calculate_last_level(conflicting);
   //std::cout << "LAST LEVEL: " << _conflict_set.last_level() << std::endl;
   _conflict_set.add_new_literals(conflicting);
-
+  
   for(unsigned i = 0; i < _observers.size(); i++)
-    _observers[i]->conflict_applied(conflicting, conflict_theory);
+    _observers[i]->conflict_applied(conflicting, conflict_ts);
 }
 
 void solver::apply_explain(const expression & l, const explanation & expl)
@@ -671,9 +584,8 @@ void solver::apply_theory_lemma(clause * cl)
 
   for(unsigned i = 0; i < _observers.size(); i++)
     _observers[i]->learn_applied(cl);
-  
-  for(unsigned i = 0; i < _theories.size(); i++)
-    _theories[i]->add_clause(cl);
+
+  get_clause_theory_solver()->add_clause(cl);
 }
 
 void solver::apply_backjump()
@@ -695,10 +607,6 @@ void solver::apply_backjump()
   add_learnt_clause(learnt_clause); 
   _state_changed = true;
   
-#ifdef _PARALLEL_PORTFOLIO
-  check_and_export_shared_clause(learnt_clause);
-#endif
-
   //  std::cout << " to size: " << _trail.size() << std::endl;
 
   for(unsigned i = 0; i < _observers.size(); i++)
@@ -707,15 +615,15 @@ void solver::apply_backjump()
 				    get_literal_data(uip_literal)->
 				    get_opposite());
   
-  for(unsigned i = 0; i < _theories.size(); i++)
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
     {
-      _theories[i]->backjump(_trail.current_level());
+      _theory_solvers[i]->backjump(_trail.current_level());
     }
+
+  for(unsigned i = 0; i < _q_processors.size(); i++)
+    _q_processors[i]->backjump(_trail.current_level());
   
-  for(unsigned i = 0; i < _theories.size(); i++)
-    {
-      _theories[i]->add_clause(learnt_clause);
-    }
+  get_clause_theory_solver()->add_clause(learnt_clause);
 }
 
 void solver::apply_forget(unsigned number_of_clauses)
@@ -727,9 +635,8 @@ void solver::apply_forget(unsigned number_of_clauses)
 
   for(unsigned i = 0; i < _observers.size(); i++)
     _observers[i]->forget_applied(_learnt_clauses, number_of_clauses);
-  
-  for(unsigned i = 0; i < _theories.size(); i++)
-    _theories[i]->remove_clauses(_learnt_clauses, number_of_clauses);
+
+  get_clause_theory_solver()->remove_clauses(_learnt_clauses, number_of_clauses);
   
   for(unsigned i = _learnt_clauses.size() - number_of_clauses; 
       i < _learnt_clauses.size(); i++)
@@ -749,8 +656,133 @@ void solver::apply_restart()
   for(unsigned i = 0; i < _observers.size(); i++)
     _observers[i]->restart_applied();
   
-  for(unsigned i = 0; i < _theories.size(); i++)
-    _theories[i]->backjump(0);
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
+    _theory_solvers[i]->backjump(0);
+
+  for(unsigned i = 0; i < _q_processors.size(); i++)
+    _q_processors[i]->backjump(0);
+}
+
+
+void solver::skolemize(const expression & l)
+{
+  static const std::string sk("sk");
+  // exists x1...xn. F(x1,....,xn)
+  assert(l->is_quantifier() && l->get_quantifier() == Q_EXISTS);
+
+  literal_data * ldata = get_literal_data(l);
+  if(ldata->is_skolemized())
+    return;
+  
+  // std::cout << "SKOLEMIZING: " << l << std::endl;
+  
+  // create unique constants c1,...,cn
+  const sorted_variable_vector & svars = l->get_quantified_variables();  
+  substitution sub;
+  for(const sorted_variable & svar : svars)
+    sub.insert(std::make_pair(svar.get_variable(), _formula_transformer->get_unique_constant(sk, svar.get_sort())));
+   
+  expression f = l->get_subexpression()->get_instance(sub);
+
+  //  std::cout << "OBTAINED: " << f << std::endl;
+
+  ldata->set_skolemized(true);
+  
+  // ~exists x1...xn.F(x1,...,xn) \/ F(c1,...,cn)
+  // forall x1...xn.~F(x1,...,xn) \/ F(c1,...,cn)
+  
+  // cnf_transformation of F(c1,...,cn) -> name, def_clauses
+  expression name;
+  std::vector<clause *> clauses;
+  _formula_transformer->cnf_transformation(f, clauses, name);
+
+  // forall x1...xn.~F(x1,...,xn) \/ name /\ (def_clauses)
+
+  apply_introduce_literal(name);
+  clause * cl = new clause();  
+  cl->push_back(get_literal_data(l)->get_opposite());
+  cl->push_back(name);
+
+  apply_theory_lemma(cl);
+  // ... Introducing new literals in clauses ...
+  for(unsigned i = 0; i < clauses.size(); i++)
+    {
+      std::unordered_set<expression> cache;
+      unsigned k = 0;
+      for(unsigned j = 0; j < clauses[i]->size(); j++)
+	{
+	  expression & l = (*clauses[i])[j];
+	  l = strip_double_negations(l);
+	  apply_introduce_literal(l);
+	  if(cache.find(l) != cache.end())
+	    continue;
+	  cache.insert(l);
+	  (*clauses[i])[k++] = l;
+	}
+      clauses[i]->resize(k);
+      apply_theory_lemma(clauses[i]);
+    }
+}
+
+void solver::instantiate(const expression & l, const expression_vector & gterms)
+{
+  // forall x1...xn. F(x1,...,xn)
+  assert(l->is_quantifier() && l->get_quantifier() == Q_FORALL);
+    
+  const sorted_variable_vector & svars = l->get_quantified_variables();
+  assert(svars.size() == gterms.size());
+  substitution sub;
+  for(unsigned i = 0; i < svars.size(); i++)
+    sub.insert(std::make_pair(svars[i].get_variable(), gterms[i]));
+
+  expression f = l->get_subexpression()->get_instance(sub);
+
+  literal_data * ldata = get_literal_data(l);
+  if(ldata->is_instantiated(f))
+    return;
+  
+  /*  std::cout << "INSTANTIATING: " << l << " with: ";
+  for(const auto & t : gterms)
+    std::cout << t << " , ";
+  std::cout << std::endl;
+  std::cout << "OBTAINED: " << f << std::endl;
+  */
+
+  
+  ldata->add_instantiation(f);
+  
+  
+  // exists x1...xn. ~F(x1,...,xn) \/ F(t1,...,tn)
+
+  // cnf_transformation of F(t1,...,tn) -> name, def_clauses
+  expression name;
+  std::vector<clause *> clauses;
+  _formula_transformer->cnf_transformation(f, clauses, name);
+  
+  // exists x1...xn. ~F(x1,...,xn) \/ name /\ (def_clauses)
+  apply_introduce_literal(name);
+  clause * cl = new clause();
+  cl->push_back(get_literal_data(l)->get_opposite());
+  cl->push_back(name);
+  apply_theory_lemma(cl);
+  // ... Introducing new literals in clauses ...
+  for(unsigned i = 0; i < clauses.size(); i++)
+    {
+      std::unordered_set<expression> cache;
+      unsigned k = 0;
+      for(unsigned j = 0; j < clauses[i]->size(); j++)
+	{
+	  expression & l = (*clauses[i])[j];
+	  l = strip_double_negations(l);
+	  apply_introduce_literal(l);
+	  if(cache.find(l) != cache.end())
+	    continue;
+	  cache.insert(l);
+	  (*clauses[i])[k++] = l;
+	}
+      clauses[i]->resize(k);
+      apply_theory_lemma(clauses[i]);
+    }
 }
 
 
@@ -762,43 +794,33 @@ check_sat_response solver::solve()
     initialize_solver_dimacs();
 
   //  unsigned long long check_count = 0;
-
+  
   unsigned decide_count = 0;
   unsigned num_of_layers = 0;
-  for(unsigned i = 0; i < _theories.size(); i++)
-    num_of_layers = std::max(num_of_layers, _theories[i]->get_num_of_layers());
+  unsigned quantifier_instantiation_count = 0;
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
+    num_of_layers = std::max(num_of_layers, _theory_solvers[i]->get_num_of_layers());
   
   unsigned layer = 0;
   while(true)
     {
-      unsigned th_index = 0, i = 0;
+      unsigned i = 0;
       
-#ifdef _PARALLEL_PORTFOLIO
-      CHECK_CANCELED;
-      if(_trail.current_level() == 0)
-	{
-	  import_shared_clauses();
-	}
-#endif
-
       _check_and_prop_time_spent.start();
       do
-	{
-	  
-	  CHECK_CANCELED;
+	{	  
 	  _state_changed = false;
 	  //	  check_count++;
-	  _theories[i]->check_and_propagate(layer);
+	  _theory_solvers[i]->check_and_propagate(layer);
 
-	  if(_state_changed)
-	    th_index = i;
-
-	  i = (i + 1) % _theories.size();
-
+	  if(_state_changed && (i != 0 || layer != 0))
+	    i = layer = 0;
+	  else
+	    i++;
 	}
-      while(!_conflict_set.is_conflict() && i != th_index);
+      while(!_conflict_set.is_conflict() && i < _theory_solvers.size());
       _check_and_prop_time_spent.acumulate();
-      
+
       if(!_conflict_set.is_conflict())
 	{
 	  if(++layer < num_of_layers)
@@ -814,24 +836,22 @@ check_sat_response solver::solve()
 	  while(!_conflict_set.all_explained())
 	    {
 	      expression l = _conflict_set.next_to_explain();
-	      _trail.get_source_theory(l)->explain_literal(l);
+	      _trail.get_source_theory_solver(l)->explain_literal(l);
 	    }
 	  _explain_time_spent.acumulate();
-	  CHECK_CANCELED;
 	  //std::cout << "SUBSUMING" << std::endl;
 	  //Removing subsumed literals
 	  _subsume_time_spent.start();
 	  const expression_vector & conflicting = _conflict_set.get_conflicting();
-	  for(unsigned i = 0; i < conflicting.size(); i++)
+	  for(unsigned j = 0; j < conflicting.size(); j++)
 	    {
-	      theory * source_theory = _trail.get_source_theory(conflicting[i]);	      
-	      // Subsumtion applied only to boolean-infered literals. 
-	      if(source_theory == _theories[0])
-	  	source_theory->explain_literal(conflicting[i]);	      
+	      theory_solver * source_ts = _trail.get_source_theory_solver(conflicting[j]);	      
+	      // Subsumtion applied only to BCP-infered literals. 
+	      if(source_ts == _theory_solvers[0])
+	  	source_ts->explain_literal(conflicting[j]);	      
 	    }
 	  _subsume_time_spent.acumulate();
 	  assert(_conflict_set.last_level() != 0 || conflicting.empty());
-	  CHECK_CANCELED;
 	  // Backjump or report UNSAT
 	  if(_conflict_set.last_level() != 0)
 	    {
@@ -872,9 +892,20 @@ check_sat_response solver::solve()
 	    return CSR_UNKNOWN;
 	}
       else
-	{
+	{	  
 	  _heuristic_time_spent.acumulate();
-	  break;
+	  _state_changed = false;
+	  for(unsigned k = 0; k < _q_processors.size(); k++)
+	    {
+	      _q_processors[k]->check_quantifiers();
+	      if(_state_changed)
+		break;
+	    }
+	  if(!_state_changed)	  
+	    break;
+
+	  if(++quantifier_instantiation_count >= _quantifier_instantiation_count_limit)
+	    return CSR_UNKNOWN;
 	}
     }
   
@@ -883,10 +914,10 @@ check_sat_response solver::solve()
 
 bool solver::verify_assignment()
 {
-  for(unsigned i = 0; i < _theories.size(); i++)
-    if(!_theories[i]->verify_assignment(_trail))
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
+    if(!_theory_solvers[i]->verify_assignment(_trail))
       {
-	std::cout << "THEORY: " << _theories[i]->get_name() << " DID NOT AKNOWLEDGE THE MODEL" << std::endl;
+	std::cout << "THEORY: " << _theory_solvers[i]->get_name() << " DID NOT AKNOWLEDGE THE MODEL" << std::endl;
 	return false;
       }
   return true;
@@ -894,8 +925,8 @@ bool solver::verify_assignment()
 
 void solver::get_model(const expression_vector & exps)
 {
-  for(unsigned i = 0; i < _theories.size(); i++)
-    _theories[i]->get_model(exps);
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
+    _theory_solvers[i]->get_model(exps);
 }
 
 void solver::print_reports(std::ostream & ostr)
@@ -908,8 +939,8 @@ void solver::print_reports(std::ostream & ostr)
     ostr << "Time spent in explain: " << _explain_time_spent.cumulative_time() << std::endl;
     ostr << "Time spent in subsume: " << _subsume_time_spent.cumulative_time() << std::endl;
     ostr << "--------------------------------" << std::endl;
-  for(unsigned i = 0; i < _theories.size(); i++)
-      _theories[i]->print_report(ostr);   
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
+      _theory_solvers[i]->print_report(ostr);   
 }
 
 solver::~solver()
@@ -929,12 +960,14 @@ solver::~solver()
   if(dynamic_cast<solver_observer *>(_restart_strategy) == 0)
     delete _restart_strategy;
 
-  for(unsigned i = 0; i < _theories.size(); i++)
-    delete _theories[i];
+  for(unsigned i = 0; i < _theory_solvers.size(); i++)
+    delete _theory_solvers[i];
   
   for(unsigned i = 0; i < _observers.size(); i++)
     delete _observers[i];
 
+  delete _formula_transformer;
+  
   clear_initial_clauses();
   clear_learnt_clauses();
   clear_literals();

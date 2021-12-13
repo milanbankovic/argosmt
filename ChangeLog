@@ -1,5 +1,14 @@
 current
 ----------
+
+*) Huge code rafactoring
+*) Basic support for quantifier reasonong
+*) Enumerative strategy for quantifier instantiation
+*) Parallelization support removed!
+
+
+Towards SMT-LIB 2.6:
+
 *) Literal string escape sequence is now ""
 *) command declare-const added to the API
 *) :interactive-mode renamed :produce-assertions
@@ -9,6 +18,9 @@ current
 *) :global-assertions option is now supported
 *) reset-assertions command is now supported
 *) reset command is now supported
+
+
+
 
 2017.07.16
 ----------

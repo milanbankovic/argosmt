@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2017 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2017,2021 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "explanation.hpp"
 #include "conflict_set.hpp"
 #include "trail.hpp"
-#include "theory.hpp"
+#include "theory_solver.hpp"
 #include "forget_strategy.hpp"
 #include "forget_selection_strategy.hpp"
 #include "restart_strategy.hpp"
@@ -33,29 +33,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "polarity_selection_strategy.hpp"
 #include "solver_observer.hpp"
 #include "wall_clock.hpp"
+#include "formula_transformer.hpp"
+#include "enumerative_quantifiers_processor.hpp"
 
-
-#ifdef _PARALLEL_PORTFOLIO
-struct solving_cancelled_exception { };
-#define CHECK_CANCELED { extern bool solving_cancelled; if(solving_cancelled) throw solving_cancelled_exception(); }
-#else
-#define CHECK_CANCELED 
-#endif
-
+/* Common data assigned to expressions */
 class common_data : public expression_data {
 private:
     
-  /* Interested theories */
-  theory * _owner = nullptr;
+  /* Interested theory solvers */
+  theory_solver * _owner = nullptr;
   bool _shared = false;
 public:
   
-  theory * get_owner() const
+  theory_solver * get_owner() const
   {
     return _owner;
   }
 
-  void set_owner(theory * th)
+  void set_owner(theory_solver * th)
   {
     _owner = th;
   }
@@ -71,24 +66,44 @@ public:
   }
   
 };
-  
+
+/* Data assigned to literals */
 class literal_data : public expression_data {
-private:
-    
+  using instantiation_set = std::unordered_set<expression>;
+private:  
+  struct quantifier_data {
+    bool _skolemized;
+    instantiation_set _insts;
+    quantifier_data()
+      :_skolemized(false),
+       _insts(HASH_TABLE_SIZE)
+    {}    
+  };
+  
   struct pair_data {
       
     // Pair of literals
     expression _l_pos;
     expression _l_neg;
-      
-    // Observing theories
-    std::vector<theory *> _theories;
-            
+    
+    // Observing theory solvers
+    unsigned long _theory_solvers;
+
+    // Quantifier data (if quantifier literal)
+    quantifier_data * _qdata;
+    
     pair_data(const expression & l_pos,
 	      const expression & l_neg)
       :_l_pos(l_pos),
-       _l_neg(l_neg)
-    {}
+       _l_neg(l_neg),
+       _theory_solvers(0UL),
+       _qdata(nullptr)
+    {
+      if(l_pos->is_quantifier())
+	_qdata = new quantifier_data();
+    }
+
+    ~pair_data() { delete _qdata; }
   };
   
   // Index in literal list
@@ -159,23 +174,47 @@ public:
   {
     return _pair_data->_l_neg;
   }
+      
+  void add_observing_theory_solver(theory_solver * th) 
+  {
+    _pair_data->_theory_solvers |= (1UL << th->get_index());
+  }
+    
+  bool is_observing_theory_solver(theory_solver * th) const
+  {
+    return _pair_data->_theory_solvers & (1UL << th->get_index());    
+  }
+
+  bool is_observed() const
+  {
+    return _pair_data->_theory_solvers != 0UL;
+  }
+
+  bool is_skolemized() const
+  {
+    return _pair_data->_qdata->_skolemized;
+  }
+
+  void set_skolemized(bool sk = true)
+  {
+    _pair_data->_qdata->_skolemized = sk;
+  }
+
+  bool is_instantiated(const expression & inst) const
+  {
+    return _pair_data->_qdata->_insts.find(inst) != _pair_data->_qdata->_insts.end();
+  }
+
+  void add_instantiation(const expression & inst)
+  {
+    _pair_data->_qdata->_insts.insert(inst);
+  }
+
+  const instantiation_set & get_instantiations() const
+  {
+    return _pair_data->_qdata->_insts;
+  }
   
-  const std::vector<theory *> & get_observing_theories() const
-  {
-    return _pair_data->_theories;
-  }
-    
-  void add_observing_theory(theory * th) 
-  {
-    if(!is_observing_theory(th))
-      _pair_data->_theories.push_back(th);
-  }
-    
-  bool is_observing_theory(theory * th) const
-  {
-    return std::find(_pair_data->_theories.begin(), _pair_data->_theories.end(), th) != _pair_data->_theories.end();
-  }
-    
   ~literal_data()
   {
     if(is_positive())
@@ -183,6 +222,7 @@ public:
   }
 };
 
+/* CDCL based SAT/SMT solver engine */
 class solver {
 
 private:
@@ -212,7 +252,7 @@ private:
  
   /* Literal data extractor */
   data_extractor<literal_data> _literal_data;
- 
+  
   /* All registered literals */
   expression_vector _literals;
 
@@ -236,7 +276,8 @@ private:
   expression_pair_to_expression_map _mapped_equalities;
 
   std::vector<solver_observer *> _observers;
-  std::vector<theory *> _theories;
+  std::vector<theory_solver *> _theory_solvers;
+  std::vector<quantifiers_processor *> _q_processors;
   literal_selection_strategy * _literal_selection_strategy;
   polarity_selection_strategy * _polarity_selection_strategy;
   forget_strategy * _forget_strategy;
@@ -246,21 +287,17 @@ private:
   unsigned _num_of_vars;
   bool _dimacs;
 
-#ifdef _PARALLEL_PORTFOLIO
-  unsigned _solver_index;
-  std::vector<clause *> _shared_clauses;
-  std::vector<unsigned> _shared_indices;
-  std::vector<solver *> & _solvers;
-  unsigned _share_size_limit;
-  unsigned _count_imports;
-#endif
-
+  formula_transformer * _formula_transformer;
+  
   wall_clock _check_and_prop_time_spent;
   wall_clock _explain_time_spent;
   wall_clock _subsume_time_spent;
   wall_clock _backjump_time_spent;
   wall_clock _heuristic_time_spent;
   wall_clock _decide_time_spent;
+
+  unsigned _quantifier_instantiation_count_limit;
+  unsigned _quantifier_instantiation_term_size_limit;
   
   void cache_equality(const expression & le, const expression & re, const expression & eq)
   { 
@@ -276,10 +313,10 @@ private:
   void clear_literals();
 
   // Introduces a new literal pair that corresponds to the literal l without sending
-  // it to the theories.
+  // it to the theory solvers.
   void introduce_literal_without_sending(expression & l);
 
-  // Sends literal pair to the theories.
+  // Sends literal pair to the theory solvers.
   void send_literals(const expression & l_pos, const expression & l_neg);
 
   void add_initial_clause(clause * cl);
@@ -287,15 +324,11 @@ private:
   void add_learnt_clause(clause * cl);
   void clear_learnt_clauses();
 
-#ifdef _PARALLEL_PORTFOLIO
-  void check_and_export_shared_clause(clause * cl);
-  void import_shared_clauses();
-#endif
-
   unsigned get_first_unlocked_index();
+
+  expression canonize_literal_rec(const expression & e);
   
 public:
-#ifndef _PARALLEL_PORTFOLIO
   solver(expression_factory * factory, bool dimacs = false)
     :_factory(factory),
      _common_data(_extractor_counter),
@@ -311,50 +344,19 @@ public:
      _forget_selection_strategy(nullptr),
      _restart_strategy(nullptr),
      _num_of_vars(0),
-     _dimacs(dimacs)
+     _dimacs(dimacs),
+     _formula_transformer(nullptr),
+     _quantifier_instantiation_count_limit((unsigned)(-1)),
+     _quantifier_instantiation_term_size_limit((unsigned)(-1))
   {
     _literals.reserve(2000);
   }
-#else
-  solver(expression_factory * factory,  std::vector<solver *> & solvers,
-	 unsigned solver_index, unsigned share_size_limit,
-	 bool dimacs = false)
-    :_factory(factory),
-     _common_data(_extractor_counter),
-     _literal_data(_extractor_counter),
-     _learnt_clauses_counter(0),
-     _trail(*this),
-     _conflict_set(*this),
-     _state_changed(false),
-     _mapped_equalities(HASH_TABLE_SIZE),
-     _literal_selection_strategy(nullptr),
-     _polarity_selection_strategy(nullptr),
-     _forget_strategy(nullptr),
-     _forget_selection_strategy(nullptr),
-     _restart_strategy(nullptr),
-     _num_of_vars(0),
-     _dimacs(dimacs),    
-     _solver_index(solver_index),
-     _shared_indices(solvers.size(), 0),
-     _solvers(solvers),
-     _share_size_limit(share_size_limit),
-     _count_imports(0)
-  {
-    _literals.reserve(2000);
-    _shared_clauses.reserve(2000);
-  }
-
-  unsigned count_imports() const
-  {
-    return _count_imports;
-  }
-#endif  
   
   void clear_state_change()
   {
     _state_changed = false;
   }
-
+  
   data_extractor_counter & extractor_counter()
   {
     return _extractor_counter;
@@ -372,7 +374,7 @@ public:
   {
     return _literal_data.has_data(e);
   }
-
+  
   common_data * get_common_data(const expression & e) const
   {
     return _common_data.get_data(e);
@@ -422,17 +424,27 @@ public:
     return _factory;
   }
 
-  void add_theory(theory * th)
+  void add_theory_solver(theory_solver * th)
   {
-    th->set_index(_theories.size());
-    _theories.push_back(th);
+    th->set_index(_theory_solvers.size());
+    _theory_solvers.push_back(th);
   }
 
-  const std::vector<theory *> & get_theories() const
+  const std::vector<theory_solver *> & get_theory_solvers() const
   {
-    return _theories;
+    return _theory_solvers;
   }
 
+  void add_quantifiers_processor(quantifiers_processor * qp)
+  {
+    _q_processors.push_back(qp);
+  }
+
+  const std::vector<quantifiers_processor *> & get_quantifiers_processors() const
+  {
+    return _q_processors;
+  }
+  
   void set_num_of_vars(unsigned num_of_vars)
   {
     _num_of_vars = num_of_vars;
@@ -441,6 +453,26 @@ public:
   unsigned get_num_of_vars() const
   {
     return _num_of_vars;
+  }
+
+  void set_quantifier_instantiation_count_limit(unsigned k)
+  {
+    _quantifier_instantiation_count_limit = k;
+  }
+
+  unsigned get_quantifier_instantiation_count_limit() const
+  {
+    return _quantifier_instantiation_count_limit;
+  }
+
+  void set_quantifier_instantiation_term_size_limit(unsigned k)
+  {
+    _quantifier_instantiation_term_size_limit = k;
+  }
+
+  unsigned get_quantifier_instantiation_term_size_limit() const
+  {
+    return _quantifier_instantiation_term_size_limit;
   }
 
   void add_observer(solver_observer * observer)
@@ -459,6 +491,17 @@ public:
     clear_learnt_clauses();
   }
 
+  clause_interface_theory_solver * get_clause_theory_solver() const
+  {
+    return static_cast<clause_interface_theory_solver*>(_theory_solvers[0]);
+  }
+
+  congruence_closure_interface_theory_solver *
+  get_congruence_closure_theory_solver() const
+  {
+    return static_cast<congruence_closure_interface_theory_solver*>(_theory_solvers[1]);
+  }
+  
   void set_literal_selection_strategy(literal_selection_strategy * lss)
   {
     _literal_selection_strategy = lss;
@@ -509,7 +552,16 @@ public:
     return _forget_strategy;
   }
 
+  void set_formula_transformer(formula_transformer * ft)
+  {
+    _formula_transformer = ft;
+  }
 
+  formula_transformer * get_formula_transformer()
+  {
+    return _formula_transformer;
+  }
+  
 
   // Initializes expression data for the literal e and its subexpressions 
   void init_expression_data(const expression & e);
@@ -550,14 +602,18 @@ public:
 				       int polarity_hint,
 				       bool add_to_polarity_hint);  
   void apply_decide(const expression & l);
-  void apply_propagate(const expression & l, theory * source_theory);
-  void apply_conflict(const explanation & conflicting, theory * conflict_theory);
+  void apply_propagate(const expression & l, theory_solver * source_ts);
+  void apply_conflict(const explanation & conflicting, theory_solver * conflict_ts);
   void apply_explain(const expression & l, const explanation & expl);
   void apply_theory_lemma(clause * cl); 
   void apply_backjump(); 
   void apply_forget(unsigned number_of_clauses);
   void apply_restart();
 
+
+  void skolemize(const expression & l);
+  void instantiate(const expression & l, const expression_vector & gterms);
+  
   check_sat_response solve();
 
   bool is_conflict()

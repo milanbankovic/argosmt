@@ -30,8 +30,8 @@ conflict_set::conflict_set(solver & sl)
    _uip_literal(sl.get_factory()->UNDEFINED_EXPRESSION()),
    _is_conflict(false)
 {
-  _explained.reserve(10000);
-  _conflicting.reserve(10000);
+  _explained.reserve(1000);
+  _conflicting.reserve(1000);
 }
   
 

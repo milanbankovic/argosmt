@@ -100,6 +100,11 @@ public:
     _lits.reserve(n);
   }
 
+  void resize(unsigned n)
+  {
+    _lits.resize(n);
+  }
+  
   unsigned capacity() const
   {
     return _lits.capacity();

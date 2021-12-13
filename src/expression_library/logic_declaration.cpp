@@ -1685,7 +1685,17 @@ public:
   }
     
 };
- 
+
+class check_uf_expression_visitor : public composite_check_expression_visitor {
+public:
+  check_uf_expression_visitor()
+  {
+    _visitors.push_back(new check_closed_expression_visitor());
+  }
+    
+};
+
+
 class check_qfuf_expression_visitor : public composite_check_expression_visitor {
 public:
   check_qfuf_expression_visitor()
@@ -2515,6 +2525,25 @@ qfrdl_logic_declaration::check_expression(const expression & exp)
   exp->accept_visitor(visitor);
   return visitor.is_valid();
 
+}
+
+
+signature * 
+uf_logic_declaration::create_signature(bool syntax_checking)
+{
+  signature * sig = new signature(signature::T_MAIN_SIGNATURE, 0, 
+				  syntax_checking);
+  _core.create_signature(sig);
+    
+  return sig;
+}
+  
+bool 
+uf_logic_declaration::check_expression(const expression & exp)
+{
+  check_uf_expression_visitor visitor;
+  exp->accept_visitor(visitor);
+  return visitor.is_valid();
 }
 
 

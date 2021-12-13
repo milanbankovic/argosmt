@@ -24,9 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <memory>
 
 #include "common.hpp"
-#ifdef _PARALLEL_PORTFOLIO
-#include <tbb/mutex.h>
-#endif 
 
 template <typename T>
 class object_factory {
@@ -46,17 +43,11 @@ private:
     
     void operator () (const T * obj) const
     {
-#ifdef _PARALLEL_PORTFOLIO
-      tbb::mutex::scoped_lock lock(_factory->_mtx);
-#endif
      _factory->_objects.erase(*obj);
     }
   };
 
   std::unordered_set<T, object_hash> _objects;
-#ifdef _PARALLEL_PORTFOLIO
-  tbb::mutex _mtx;
-#endif
 public:
   
   object_factory(std::size_t size = HASH_TABLE_SIZE)
@@ -70,9 +61,6 @@ public:
 
   std::shared_ptr<const T> add_object(T && obj)
   {
-#ifdef _PARALLEL_PORTFOLIO
-    tbb::mutex::scoped_lock lock(_mtx);
-#endif
     typename std::unordered_set<T, object_hash>::const_iterator it = _objects.find(obj);
     if(it != _objects.end())
       return it->shared_from_this();				     

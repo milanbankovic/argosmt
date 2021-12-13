@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define _SOLVER_OBSERVER_H
 
 #include "clause.hpp"
-#include "theory.hpp"
+#include "theory_solver.hpp"
 
 class explanation;
 
@@ -43,11 +43,11 @@ public:
   {}
 
   virtual void propagate_applied(const expression & l, 
-				 const theory * source_theory)
+				 const theory_solver * source_theory)
   {}
 
-  virtual void conflict_applied(const explanation & conflicting, 				
-				theory * conflict_theory)
+  virtual void conflict_applied(const explanation & conflicting,
+				const theory_solver * conflict_theory)
   {}
 
   virtual void explain_applied(const expression & l, 

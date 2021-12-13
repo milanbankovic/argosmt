@@ -129,16 +129,13 @@ private:
       
   };
 
-#ifndef _PARALLEL_PORTFOLIO
   static object_factory<data> * _factory;
-
   static object_factory<data> & get_factory()
   {
     if(_factory == 0)
       _factory = new object_factory<data>();
     return *_factory;
   }
-#endif
   std::shared_ptr<const data> _data;
 public:
   /** Constructor that initializes the constant of the given type with
@@ -1751,15 +1748,9 @@ special_constant::special_constant(type tp, const std::string & value)
 inline
 special_constant::special_constant(type tp, std::string && value)
 {
-#ifndef _PARALLEL_PORTFOLIO
   data d(tp, std::move(value));
   d.calculate_hash();
   _data = get_factory().add_object(std::move(d));
-#else 
-  data * d = new data(tp, std::move(value));
-  d->calculate_hash();
-  _data.reset(d);
-#endif
 }
 
 inline
@@ -1832,11 +1823,7 @@ std::string special_constant::to_string() const
 inline
 bool special_constant::operator == (const special_constant & c) const
 {
-#ifndef _PARALLEL_PORTFOLIO
   return _data == c._data;
-#else
-  return _data == c._data || *_data == *c._data;
-#endif
 }
   
 inline 

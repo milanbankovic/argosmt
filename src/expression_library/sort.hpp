@@ -164,7 +164,7 @@ public:
       given in instantiation in the sort represented by the node. Recall
       that instantiation is a map that maps sort_parameters to sorts which
       replace them. */
-  virtual sort get_instance(const instantiation & in) = 0;
+  virtual sort get_instance(const instantiation & in) const = 0;
 
   /** Returns true if the sort represented by the argument 
       can be obtained from this sort, using some instantiation (which is then
@@ -188,21 +188,21 @@ public:
       definitions should be searched (starting with the signature given 
       by the first argument). */
   virtual sort expand_sort(const signature * sg, 
-			   search_mode smode = S_CONTEXTUAL) = 0;
-  
+			   search_mode smode = S_CONTEXTUAL) const = 0;
+ 
   /** Expands sort with respect to the main signature and _contextual_ search
       mode (default mode). */
-  sort expand_sort();
+  sort expand_sort() const;
 
   /** Returns true if the sort given by the argument is equivalent to 
       this sort. Two sorts s1 and s2 are equivalent if 
       s1->expand_sort() == s2->expand_sort(). */
-  bool is_equivalent(const sort & sr);
+  bool is_equivalent(const sort & sr) const;
   
   /** Returns true if the sort given by the first argument is instance 
       equivalent to this sort. Two sorts s1 and s2 are instance equivalent if 
       s1->expand_sort()->is_instance(s2->expand_sort(), ins). */
-  bool is_instance_equivalent(const sort & sr, instantiation & ins);
+  bool is_instance_equivalent(const sort & sr, instantiation & ins) const;
 
   /** Support for visitor design pattern. Subsorts are traversed in a
       depth-first order, applying the visitor to each node. */
@@ -350,13 +350,13 @@ public:
   virtual const sort_parameter & get_parameter() const;
   virtual const sort_parameter_set & get_parameters();
   virtual const sort_vector & get_operands() const;
-  virtual sort get_instance(const instantiation & in);
+  virtual sort get_instance(const instantiation & in) const;
   virtual bool is_instance(const sort & sr, 
 			   instantiation & in) const;
   virtual bool check_sort(const signature * sg,
 			  search_mode smode = S_CONTEXTUAL) const;
   virtual sort expand_sort(const signature * sg, 
-			   search_mode smode = S_CONTEXTUAL);
+			   search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(sort_visitor & visitor);
 
   virtual unsigned get_complexity() const;
@@ -389,13 +389,13 @@ public:
   virtual const sort_parameter & get_parameter() const;
   virtual const sort_parameter_set & get_parameters();
   virtual const sort_vector & get_operands() const;  
-  virtual sort get_instance(const instantiation & in);
+  virtual sort get_instance(const instantiation & in) const;
   virtual bool is_instance(const sort & sr,
 			   instantiation & in) const;
   virtual bool check_sort(const signature * sg,
 			  search_mode smode = S_CONTEXTUAL) const;
   virtual sort expand_sort(const signature * sg, 
-			   search_mode smode = S_CONTEXTUAL);
+			   search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(sort_visitor & visitor);
     
   virtual unsigned get_complexity() const;
@@ -441,13 +441,13 @@ public:
   virtual const sort_parameter & get_parameter() const;
   virtual const sort_parameter_set & get_parameters();
   virtual const sort_vector & get_operands() const;
-  virtual sort get_instance(const instantiation & in);
+  virtual sort get_instance(const instantiation & in) const;
   virtual bool is_instance(const sort & sr,
 			   instantiation & in) const;
   virtual bool check_sort(const signature * sg,
 			  search_mode smode = S_CONTEXTUAL) const;
   virtual sort expand_sort(const signature * sg, 
-			   search_mode smode = S_CONTEXTUAL);
+			   search_mode smode = S_CONTEXTUAL) const;
   virtual void accept_visitor(sort_visitor & visitor);
 
   virtual unsigned get_complexity() const;
@@ -838,20 +838,20 @@ std::ostream & operator << (std::ostream & ostr, const sort & sr)
 }
 
 inline
-sort sort_node::expand_sort()
+sort sort_node::expand_sort() const
 {
   return this->expand_sort(_factory->get_signature(), S_CONTEXTUAL);
 }
 
 inline
-bool sort_node::is_equivalent(const sort & sr)
+bool sort_node::is_equivalent(const sort & sr) const
 {
   return this == sr.get() || this->expand_sort() == sr->expand_sort();
 }
 
 inline
 bool sort_node::
-is_instance_equivalent(const sort & sr, instantiation & ins)
+is_instance_equivalent(const sort & sr, instantiation & ins) const
 {
   return this == sr.get() || 
     this->expand_sort()->is_instance(sr->expand_sort(), ins);
@@ -964,9 +964,9 @@ const sort_vector & undefined_sort_node::get_operands() const
 }
 
 inline
-sort undefined_sort_node::get_instance(const instantiation & in)
+sort undefined_sort_node::get_instance(const instantiation & in) const
 {
-  return this->shared_from_this();
+  return const_cast<undefined_sort_node*>(this)->shared_from_this();
 }
 
 inline
@@ -1003,9 +1003,9 @@ bool undefined_sort_node::check_sort(const signature * sg,
 
 inline
 sort undefined_sort_node::expand_sort(const signature * sg, 
-				      search_mode smode)
+				      search_mode smode) const
 {
-  return this->shared_from_this();
+  return const_cast<undefined_sort_node*>(this)->shared_from_this();
 }
 
 inline
@@ -1085,7 +1085,7 @@ const sort_vector & parameter_sort_node::get_operands() const
 }
 
 inline
-sort parameter_sort_node::get_instance(const instantiation & in)
+sort parameter_sort_node::get_instance(const instantiation & in) const
 {
   instantiation::const_iterator it = in.find(_parameter);
   
@@ -1094,7 +1094,7 @@ sort parameter_sort_node::get_instance(const instantiation & in)
       return it->second;
     }
   else
-    return this->shared_from_this();
+    return const_cast<parameter_sort_node*>(this)->shared_from_this();
 }
 
 inline
@@ -1142,9 +1142,9 @@ bool parameter_sort_node::check_sort(const signature * sg,
 
 inline
 sort parameter_sort_node::expand_sort(const signature * sg, 
-				      search_mode smode)
+				      search_mode smode) const
 {
-  return this->shared_from_this();
+  return const_cast<parameter_sort_node*>(this)->shared_from_this();
 }
 
 inline
@@ -1364,10 +1364,6 @@ const sort & sort_factory::BOOL_SORT() const
 inline
 sort sort_factory::create_sort(const sort_parameter & par)
 {
-#ifdef _PARALLEL_PORTFOLIO
-  parameter_sort_node _par_node(this);
-#endif
-
   _par_node._parameter = par;
   _par_node.calculate_hash();
 
@@ -1404,19 +1400,11 @@ inline
 sort sort_factory::create_sort(const sort_symbol & symbol, 
 			       sort_vector && sorts)
 {
-#ifdef _PARALLEL_PORTFOLIO
-  symbol_sort_node _sym_node(this);
-#endif
-
   _sym_node._symbol = symbol;
   _sym_node._operands = sorts.empty() ? &EMPTY_SORT_VECTOR : &sorts;
   _sym_node.calculate_hash();
 
   std::unordered_set<sort_node *>::iterator it = _sorts.find(&_sym_node);
-
-#ifdef _PARALLEL_PORTFOLIO
-  _sym_node._operands = &EMPTY_SORT_VECTOR;
-#endif
   
   if(it != _sorts.end())
     return (*it)->shared_from_this();

@@ -9,7 +9,6 @@ noinst_HEADERS = object_factory.hpp \
 	         wall_clock.hpp \
 	         timeout.hpp \
 	 	 cmd_line_parser.hpp \
-	         conditional_tbb_wrapper.hpp \
 	         hash_vector.hpp \
 	         vector_hash_code.hpp \
 	         common.hpp \

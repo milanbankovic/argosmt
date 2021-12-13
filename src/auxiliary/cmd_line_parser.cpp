@@ -97,12 +97,6 @@ void cmd_line_parser::parse_cmd_line(int argc, char ** argv)
 	  std::cerr << "Copyright (C) 2008-2015 Milan Bankovic (" << PACKAGE_BUGREPORT << ")" << std::endl;
 	  std::cerr << "This is free software; see the source for copying conditions.  There is NO\n"
 	    "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE." << std::endl;
-#ifdef _PARALLEL_PORTFOLIO
-	  std::cerr << "Parallel portfolio: enabled" << std::endl;
-#endif
-#ifdef _PARALLEL_SIMPLEX
-	  std::cerr << "Parallel simplex: enabled" << std::endl;
-#endif
 	  exit(1);
 	}
       else if(std::string("-l") == argv[i] || std::string("--list-config-options") == argv[i])

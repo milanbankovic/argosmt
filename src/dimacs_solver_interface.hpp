@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2014 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2014,2021 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "solver.hpp"
 #include "cmd_line_parser.hpp"
-#include "bool_theory.hpp"
+#include "clause_theory_solver.hpp"
 #include "logging_solver_observer.hpp"
 #include "statistics_solver_observer.hpp"
 #include "first_undefined_literal_selection_strategy.hpp"
@@ -44,17 +44,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "clause_length_forget_selection_strategy.hpp"
 #include "wall_clock.hpp"
 #include "timeout.hpp"
-#include "conditional_tbb_wrapper.hpp"
-
 
 class dimacs_solver_interface {
 private:
-  std::vector<solver *> _solvers; /* For parallel portfolio */
-  std::vector<statistics_solver_observer *> _statistics_observers;
-  solver * _solver;  /* Successful solver pointer */
+  solver * _solver;
+  statistics_solver_observer * _stat;
   wall_clock _cl;
-  unsigned _instance_index; /* Succesful solver index */
-
+  
   signature _my_signature;
   expression_factory _my_factory;
   
@@ -74,20 +70,13 @@ private:
   void read_dimacs(std::istream & istr, std::vector<clause *> & clauses, unsigned & num_of_vars);
   
 public:
-  dimacs_solver_interface(unsigned numofsolvers = 1)
-    :_solvers(numofsolvers, (solver*)0),
-     _statistics_observers(numofsolvers, (statistics_solver_observer*)0),
-     _solver(0),
-     _instance_index(0),
+  dimacs_solver_interface()
+    :_solver(nullptr),
+     _stat(nullptr),
      _my_factory(&_my_signature)
   {}
 
-  void set_solver_instance_index(unsigned k)
-  {
-    _instance_index = k;
-  }
-
-  check_sat_response start_solver(const std::vector<clause *> & clauses, unsigned num_of_vars, unsigned k = 0);
+  check_sat_response start_solver(const std::vector<clause *> & clauses, unsigned num_of_vars);
   
   void check_sat();  
 };

@@ -41,12 +41,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "all_forget_selection_strategy.hpp"
 #include "clause_activity_forget_selection_strategy.hpp"
 #include "clause_length_forget_selection_strategy.hpp"
-#include "bool_theory.hpp"
-#include "euf_theory.hpp"
-#include "arithmetic_theory.hpp"
-#include "csp_theory.hpp"
+#include "clause_theory_solver.hpp"
+#include "euf_theory_solver.hpp"
+#include "arithmetic_theory_solver.hpp"
+#include "csp_theory_solver.hpp"
 #include "wall_clock.hpp"
 #include "cmd_line_parser.hpp"
+#include "formula_transformer.hpp"
+#include "enumerative_quantifiers_processor.hpp"
+#include "e_matching_quantifiers_processor.hpp"
 
 #include "simple_csp_variable_order_strategy.hpp"
 #include "simple_csp_value_order_strategy.hpp"
@@ -56,73 +59,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 class argosmt_solver_interface : public solver_interface {
 private:
-  
-  expression get_unique_constant(const std::string & prefix, const sort & s)
-  {
-    static int count = 0;
-    function_symbol uniq_name(prefix + std::to_string(++count));
-    _smt_lib_api->declare_function(uniq_name, s); 
-    
-    return _smt_lib_api->get_expression_factory()->create_expression(uniq_name);
-  }
-  
-  bool is_chainable(const expression & e)
-  {
-    const function_symbol & fs = e->get_symbol();
-    return 
-      fs == function_symbol::EQ ||
-      fs == function_symbol::LT ||
-      fs == function_symbol::LE ||
-      fs == function_symbol::GT ||
-      fs == function_symbol::GE;
-  }
-
-  bool is_pairwise(const expression & e)
-  {
-    const function_symbol & fs = e->get_symbol();
-    return 
-      fs == function_symbol::DISTINCT;
-  }
-
-  expression simplification(const expression & expr);
-
-  expression negate_name(const expression & name)
-  {
-    if(name->is_not())
-      return name->get_operands()[0];
-    else
-      return _smt_lib_api->get_expression_factory()->
-	create_expression(function_symbol::NOT, name);
-  }
-
-  void cnf_transformation_rec(const expression & expr, 
-			      std::vector<clause *> & clauses, 
-			      expression & name);
-  
-  void cnf_transformation(const expression & expr, 
-			  std::vector<clause *> & clauses);
-
-
-  std::vector<solver *> _solvers; /* For parallel portfolio */
-  std::vector<statistics_solver_observer *> _statistics_observers;
-  solver * _solver;  /* Successful solver pointer */
+  solver * _solver;
+  statistics_solver_observer * _stat;
   wall_clock _cl;
-  unsigned _instance_index; /* Succesful solver index */
 
 public:
-  argosmt_solver_interface(unsigned numofsolvers = 1)
-    :_solvers(numofsolvers, nullptr),
-     _statistics_observers(numofsolvers, nullptr),
-     _solver(nullptr),
-     _instance_index(0)
+  argosmt_solver_interface()
+    :_solver(nullptr),
+     _stat(nullptr)
   {}
-
-  void set_solver_instance_index(unsigned k)
-  {
-    _instance_index = k;
-  }
   
-  check_sat_response start_solver(const std::vector<clause *> & clauses, unsigned k = 0);
+  check_sat_response start_solver(const std::vector<clause *> & clauses, formula_transformer * ft);
 
   virtual void init_interface()
   {
@@ -131,12 +78,9 @@ public:
 
   virtual void reset_interface()
   {
-    _statistics_observers.assign(_statistics_observers.size(), nullptr);
-    for(solver * sl : _solvers)
-      delete sl; 
-    _solvers.assign(_solvers.size(), nullptr);
+    _stat = nullptr;
+    delete _solver;
     _solver = nullptr;
-    _instance_index = 0;
   }
   
   virtual check_sat_response check_sat();  

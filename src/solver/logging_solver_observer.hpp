@@ -48,14 +48,15 @@ public:
   }
 
   virtual void propagate_applied(const expression & l, 
-				 const theory * source_theory)
+				 const theory_solver * source_ts)
   {
-    _ostr << "Propagation applied: " << l << " (theory " << source_theory->get_name() << ")" << std::endl;
+    _ostr << "Propagation applied: " << l << " (theory_solver " << source_ts->get_name() << ")" << std::endl;
   }
 
-  virtual void conflict_applied(const explanation & conflicting, theory * conflict_theory)
+  virtual void conflict_applied(const explanation & conflicting,
+				const theory_solver * conflict_ts)
   {
-     _ostr << "Conflict applied (theory " << conflict_theory->get_name() << "): ";
+     _ostr << "Conflict applied (theory_solver " << conflict_ts->get_name() << "): ";
     for(unsigned i = 0; i < conflicting.size(); i++)
       _ostr << conflicting[i] << ",";
     _ostr << std::endl; 
@@ -64,7 +65,7 @@ public:
   virtual void explain_applied(const expression & l, const explanation & expl)
   {
     _ostr << "Explain applied: " << l 
-    	  << " (" << _solver.get_trail().get_source_theory(l)->get_name() 
+    	  << " (" << _solver.get_trail().get_source_theory_solver(l)->get_name() 
     	  << ") (level: " << _solver.get_trail().get_trail_level(l) 
     	  << ") : (size: " << expl.size() << ") : ";
     for(unsigned i = 0; i < expl.size(); i++)

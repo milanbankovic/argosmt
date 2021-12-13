@@ -28,7 +28,7 @@ private:
   std::shared_ptr<T> _ptr;
 public:
   cow_wrapper()
-    :_ptr((T*)0)
+    :_ptr(nullptr)
   {}
 
   cow_wrapper(T * t)
@@ -36,16 +36,16 @@ public:
   {}
 
   cow_wrapper(const T & t)
-    :_ptr(new T(t))
+    :_ptr(std::make_shared<T>(t))
   {}
 
   cow_wrapper(T && t)
-    :_ptr(new T(std::move(t)))
+    :_ptr(std::make_shared<T>(std::move(t)))
   {}
   
   bool is_valid() const
   {
-    return _ptr.get() != 0;
+    return _ptr.get() != nullptr;
   }
 
   const T & const_ref() const
@@ -62,7 +62,7 @@ public:
   {
     if(!_ptr.unique())
       {
-	_ptr.reset(new T(*_ptr));
+	_ptr = std::make_shared<T>(*_ptr);
       }
     return *_ptr;
   }

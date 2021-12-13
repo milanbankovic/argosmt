@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2015 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2015,2021 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ***************************************************************************/
 #include "timeout.hpp"
-#include "conditional_tbb_wrapper.hpp"
 #include "dimacs_solver_interface.hpp"
 #include "solver_configuration.hpp"
 
@@ -31,21 +30,8 @@ int main(int argc, char ** argv)
       s_config.parse_config_file(cmd_line_parser::config_file());
       cmd_line_parser::close_config();
     }
-
-#ifdef _USE_TBB
-#ifdef _PARALLEL_PORTFOLIO
-  tbb::task_scheduler_init ts(std::max(s_config.number_of_threads(),
-				       s_config.number_of_solvers()));
-#else
-  tbb::task_scheduler_init ts(s_config.number_of_threads());
-#endif
-#endif
   
-#ifndef _PARALLEL_PORTFOLIO
   dimacs_solver_interface dsi;
-#else
-  dimacs_solver_interface dsi(s_config.number_of_solvers());
-#endif
 
   if(cmd_line_parser::timeout() != 0)
     {

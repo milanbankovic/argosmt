@@ -131,7 +131,7 @@ public:
   }
   
   virtual void propagate_applied(const expression & l, 
-				 const theory * /* source_theory */)
+				 const theory_solver * /* source_theory */)
   {
     adjust_polarity_hint(l);
   }
