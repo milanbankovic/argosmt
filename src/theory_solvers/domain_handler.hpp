@@ -259,8 +259,7 @@ public:
   const expression & get_assigned_value() const;
   virtual void assert_literal(const expression & l);
   virtual void check_and_propagate(unsigned layer);
-  virtual void explain_literal(const expression & l);
-
+  virtual explanation get_literal_explanation(const expression & l);
   void explain_minimum_at_trail_size(unsigned size, explanation & expl);
   void explain_maximum_at_trail_size(unsigned size, explanation & expl);
   void explain_minmax_at_trail_size(unsigned size, explanation & expl);

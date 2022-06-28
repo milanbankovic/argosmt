@@ -102,7 +102,7 @@ private:
     {
       return _parent;
     }
-
+    
     bool should_explain() const
     {
       return _explain;
@@ -137,7 +137,6 @@ private:
     history_saver<unsigned> _use_list_length;
     expression_vector _use_list;
     history_saver<forest_entry> _proof_forest;
-    history_saver<expression> _representing_literal;
     
   public:
     euf_theory_solver_data(const expression e, bool relevant, const unsigned & level)
@@ -148,8 +147,7 @@ private:
        _class_list{e},
        _use_list_length(level, 0U),
        _use_list(),
-       _proof_forest(level, forest_entry(e)),
-       _representing_literal(level, expression())
+       _proof_forest(level, forest_entry(e))
     {
       if(!relevant)
 	return;
@@ -170,7 +168,6 @@ private:
       if(_use_list_length.const_ref() != std::numeric_limits<unsigned>::max())
 	_use_list.resize(_use_list_length.const_ref());
       _proof_forest.restore_state();
-      _representing_literal.restore_state();
     }
 
     unsigned current_level() const
@@ -241,21 +238,6 @@ private:
     {
       _proof_forest.ref() = fe;
     }
-
-    const expression & get_representing_literal() const
-    {
-      return _representing_literal.const_ref();
-    }
-
-    bool has_representing_literal() const
-    {
-      return _representing_literal.const_ref().get() != 0;
-    }
-
-    void set_representing_literal(const expression & l)
-    {
-      _representing_literal.ref() = l;
-    }
   };
 
 
@@ -284,7 +266,14 @@ private:
 		 backjump_lookup_func> _lookup_history;
   expression_vector _trivial_propagations;
   expression_vector _new_literals;
-  expression_to_expression_map _disequality_propagation_causes;
+
+  struct dpc_entry {
+    expression cdiseq;
+    bool swapped;
+  };
+  
+  std::unordered_map<expression, dpc_entry>  _disequality_propagation_causes;
+  expression_to_expression_map _predicate_propagation_causes;
   unsigned _current_assertion_pos;
   bool _just_backjumped;
   wall_clock _check_and_prop_time_spent;
@@ -329,6 +318,7 @@ private:
 			  expression a, expression c);
   void explain(const expression & c1, const expression & c2, 
 	       std::vector<expression_pair> & expl_output);
+  void find_nodes_on_path(const expression & a, const expression & b, std::vector<expression> & path);
   void generate_explanation(const std::vector<expression_pair> & expl_output, explanation & expl);
   void explain_equality(const expression & eq, explanation & expl);
   void explain_disequality(const expression & diseq, explanation & expl);
@@ -365,6 +355,8 @@ public:
 
   virtual void check_and_propagate(unsigned layer);
 
+  virtual explanation get_literal_explanation(const expression & l);
+  
   virtual void explain_literal(const expression & l);
   
   virtual bool is_owned_expression(const expression & e);

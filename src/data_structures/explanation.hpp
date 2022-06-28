@@ -37,21 +37,73 @@ public:
      _cl(0),
      _index((unsigned)(-1))
   {}
-  
-  explanation(solver * sl, clause * cl)
-    :_lits(),
-     _sl(sl),
-     _cl(cl),
-     _index((unsigned)(-1))
-  {}
-  
-  explanation(solver * sl, clause * cl, unsigned index)
+    
+  explanation(solver * sl, clause * cl, unsigned index = (unsigned)(-1))
     :_lits(),
      _sl(sl),
      _cl(cl),
      _index(index)
-  {}
+  {
+#ifdef _TRAIL_SAVING
+    if(cl != nullptr)
+      cl->increment_expl_obj_count();
+#endif
+  }
 
+#ifdef _TRAIL_SAVING
+  explanation(const explanation & expl)
+    :_lits(expl._lits),
+     _sl(expl._sl),
+     _cl(expl._cl),
+     _index(expl._index)
+  {
+    if(_cl != nullptr)
+      _cl->increment_expl_obj_count();
+  }
+  explanation(explanation && expl)
+    :_lits(std::move(expl._lits)),
+     _sl(expl._sl),
+     _cl(expl._cl),
+     _index(expl._index)
+  {
+    expl._cl = nullptr;
+  }
+
+  explanation & operator = (const explanation & expl)
+  {
+    if(&expl == this)
+      return *this;
+
+    _lits = expl._lits;
+    _sl = expl._sl;
+    if(_cl != nullptr)
+      _cl->decrement_expl_obj_count();
+    _cl = expl._cl;
+    if(_cl != nullptr)
+      _cl->increment_expl_obj_count();
+    _index = expl._index;
+    
+    return *this;    
+  }
+  
+  explanation & operator = (explanation && expl)
+  {
+    if(&expl == this)
+      return *this;
+
+    _lits = std::move(expl._lits);
+    _sl = expl._sl;
+    if(_cl != nullptr)
+      _cl->decrement_expl_obj_count();
+    _cl = expl._cl;
+    expl._cl = nullptr;
+    _index = expl._index;
+
+    return *this;    
+  }
+
+#endif
+  
   bool is_clause_explanation() const
   {
     return _cl != 0;
@@ -71,8 +123,16 @@ public:
   {
     return operator[](size() - 1);
   }
-
+  
   void out(std::ostream & ostr) const;
+
+#ifdef _TRAIL_SAVING
+  ~explanation()
+  {
+    if(_cl != nullptr)
+      _cl->decrement_expl_obj_count();
+  }
+#endif 
 };
 
 inline

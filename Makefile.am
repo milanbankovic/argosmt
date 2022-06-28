@@ -1,4 +1,5 @@
 SUBDIRS = src
 
-EXTRA_DIST = config.cfg config_as.cfg config_bel.cfg config_pt.cfg config_fast.cfg
+EXTRA_DIST = config.cfg config_as.cfg config_bel.cfg config_pt.cfg config_fast.cfg ts_config.cfg
+
 

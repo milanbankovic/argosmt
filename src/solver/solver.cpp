@@ -239,7 +239,11 @@ unsigned solver::get_first_unlocked_index()
   unsigned first_unlocked = 0;
   for(unsigned i = 0; i < _learnt_clauses.size(); i++)
     {
+#ifndef _TRAIL_SAVING
       if(_learnt_clauses[i]->is_locked())
+#else
+	if(_learnt_clauses[i]->is_locked() || _learnt_clauses[i]->get_expl_obj_count() > 0)
+#endif
 	{
 	  clause * temp = _learnt_clauses[first_unlocked];
 	  _learnt_clauses[first_unlocked] = _learnt_clauses[i];
@@ -497,22 +501,22 @@ void solver::initialize_solver_dimacs()
 void solver::apply_decide(const expression & l)
 {
   _trail.new_level();
- 
-  //  std::cout << "DECIDE: " << l << " level: " << _trail.current_level() << std::endl;
- 
+   
   for(unsigned i = 0; i < _theory_solvers.size(); i++)
     _theory_solvers[i]->new_level();
 
   for(unsigned i = 0; i < _q_processors.size(); i++)
     _q_processors[i]->new_level();
   
-  //std::cerr << get_literal_data(l)->get_positive() << ":" << get_literal_data(l)->is_positive() << std::endl;
-
   _trail.push(l, 0);
   _state_changed = true;
   
   for(unsigned i = 0; i < _observers.size(); i++)
     _observers[i]->decide_applied(l);
+
+#ifdef _TRAIL_SAVING
+  _ts_all_decides_count++;
+#endif
 }
 
 void solver::apply_propagate(const expression & l, theory_solver * source_ts)
@@ -526,7 +530,11 @@ void solver::apply_propagate(const expression & l, theory_solver * source_ts)
   _state_changed = true; 
   
   for(unsigned i = 0; i < _observers.size(); i++)
-    _observers[i]->propagate_applied(l, source_ts);      
+    _observers[i]->propagate_applied(l, source_ts);
+
+#ifdef _TRAIL_SAVING
+  _ts_all_props_count++;
+#endif
 }
 
 void solver::apply_conflict(const explanation & conflicting, theory_solver * conflict_ts)
@@ -534,19 +542,16 @@ void solver::apply_conflict(const explanation & conflicting, theory_solver * con
   if(_conflict_set.is_conflict())
     return;
 
-  //  std::cout << "Conflicting: " << conflict_ts->get_name() << std::endl;
-  //for(unsigned i = 0; i < conflicting.size(); i++)
-  // std::cout << conflicting[i] << " , ";
-  //std::cout << std::endl;
-
   _conflict_set.set_conflict();
   _state_changed = true;
   _conflict_set.calculate_last_level(conflicting);
-  //std::cout << "LAST LEVEL: " << _conflict_set.last_level() << std::endl;
   _conflict_set.add_new_literals(conflicting);
   
   for(unsigned i = 0; i < _observers.size(); i++)
     _observers[i]->conflict_applied(conflicting, conflict_ts);
+#ifdef _TRAIL_SAVING
+  _ts_all_cflts_count++;
+#endif
 }
 
 void solver::apply_explain(const expression & l, const explanation & expl)
@@ -554,8 +559,10 @@ void solver::apply_explain(const expression & l, const explanation & expl)
   assert(_trail.get_trail_level(l) <= _conflict_set.last_level());
   
 #ifndef NDEBUG
-  //  for(unsigned i = 0; i < expl.size(); i++)
-  // assert(_trail.get_trail_index(expl[i]) < _trail.get_trail_index(l));
+  for(unsigned i = 0; i < expl.size(); i++)
+    {
+      assert(_trail.get_trail_index(expl[i]) < _trail.get_trail_index(l));
+    }
 #endif
 
   if(_trail.get_trail_level(l) < _conflict_set.last_level())
@@ -569,7 +576,7 @@ void solver::apply_explain(const expression & l, const explanation & expl)
 	}
     }
   else 
-    {
+    {	
       _conflict_set.add_new_literals(expl);
       for(unsigned i = 0; i < _observers.size(); i++)
 	_observers[i]->explain_applied(l, expl);
@@ -599,16 +606,15 @@ void solver::apply_backjump()
 
   assert(level < _trail.current_level());
   
-  //  std::cout << "Backjump: from level: " << _trail.current_level() << " to level: " << level << std::endl;
-  //std::cout << "Size from: " << _trail.size();
-
+#ifdef _TRAIL_SAVING
+  save_trail(level);
+#endif
+  
   _trail.backjump(level);
   _conflict_set.reset_conflict();
   add_learnt_clause(learnt_clause); 
   _state_changed = true;
-  
-  //  std::cout << " to size: " << _trail.size() << std::endl;
-
+   
   for(unsigned i = 0; i < _observers.size(); i++)
     _observers[i]->backjump_applied(_trail.current_level(), 
 				    learnt_clause,    
@@ -624,6 +630,15 @@ void solver::apply_backjump()
     _q_processors[i]->backjump(_trail.current_level());
   
   get_clause_theory_solver()->add_clause(learnt_clause);
+
+#ifdef _TRAIL_SAVING
+  _ts_all_backtracks_count++;
+
+  if(_saved_trail.size() > _literals.size())
+    {
+      filter_saved_trail();
+    }
+#endif  
 }
 
 void solver::apply_forget(unsigned number_of_clauses)
@@ -632,7 +647,7 @@ void solver::apply_forget(unsigned number_of_clauses)
     return;
   
   _state_changed = true;
-
+  
   for(unsigned i = 0; i < _observers.size(); i++)
     _observers[i]->forget_applied(_learnt_clauses, number_of_clauses);
 
@@ -650,6 +665,11 @@ void solver::apply_restart()
 {
   assert(_trail.current_level() != 0);
 
+#ifdef _TRAIL_SAVING
+  save_trail(0);
+#endif
+
+  
   _trail.backjump(0);
   _state_changed = true; 
   
@@ -661,6 +681,14 @@ void solver::apply_restart()
 
   for(unsigned i = 0; i < _q_processors.size(); i++)
     _q_processors[i]->backjump(0);
+
+
+#ifdef _TRAIL_SAVING
+  if(_saved_trail.size() > _literals.size())
+    {
+      filter_saved_trail();
+    }
+#endif  
 }
 
 
@@ -792,8 +820,6 @@ check_sat_response solver::solve()
     initialize_solver();
   else
     initialize_solver_dimacs();
-
-  //  unsigned long long check_count = 0;
   
   unsigned decide_count = 0;
   unsigned num_of_layers = 0;
@@ -810,7 +836,7 @@ check_sat_response solver::solve()
       do
 	{	  
 	  _state_changed = false;
-	  //	  check_count++;
+
 	  _theory_solvers[i]->check_and_propagate(layer);
 
 	  if(_state_changed && (i != 0 || layer != 0))
@@ -829,17 +855,16 @@ check_sat_response solver::solve()
 	    layer = 0;       
 	}
       else
-	{	  
+	{
 	  // Resolving literal from current level
-	  //std::cout << "EXPLAINING" << std::endl;
 	  _explain_time_spent.start();
 	  while(!_conflict_set.all_explained())
 	    {
-	      expression l = _conflict_set.next_to_explain();
+	      expression l = _conflict_set.next_to_explain();	     
 	      _trail.get_source_theory_solver(l)->explain_literal(l);
 	    }
 	  _explain_time_spent.acumulate();
-	  //std::cout << "SUBSUMING" << std::endl;
+
 	  //Removing subsumed literals
 	  _subsume_time_spent.start();
 	  const expression_vector & conflicting = _conflict_set.get_conflicting();
@@ -881,9 +906,40 @@ check_sat_response solver::solve()
 
       expression decision_literal;
       _heuristic_time_spent.start();
+#ifdef _TRAIL_SAVING  
+      confirm_saved_propagations();
+      expression dliteral;
+      if(_ts_use_lookahead)
+	{
+	  if(_should_check_forced_decides)
+	    saved_conflict_lookahead();
+      
+	  while(!_ts_force_decides.empty() && _trail.get_value(_ts_force_decides[0]) == EB_TRUE)
+	    _ts_force_decides.pop_front();
+      	  
+	  if(!_ts_force_decides.empty() && _trail.get_value(_ts_force_decides[0]) == EB_UNDEFINED)
+	    {
+	      dliteral = _ts_force_decides[0];
+	      _ts_force_decides.pop_front();
+	      _ts_lookahead_decides_count++;
+	    }
+	  //	  else
+	  // _ts_force_decides.clear();
+	}
+
+      if(dliteral.get() == nullptr)
+	{
+	  if(_literal_selection_strategy->select_decision_literal(decision_literal))
+	    dliteral = _polarity_selection_strategy->get_literal(decision_literal);
+	}
+      
+      if(dliteral.get() != nullptr)
+	{
+#else
       if(_literal_selection_strategy->select_decision_literal(decision_literal))
 	{
 	  expression dliteral = _polarity_selection_strategy->get_literal(decision_literal);
+#endif
 	  _heuristic_time_spent.acumulate();
 	  _decide_time_spent.start();
 	  apply_decide(dliteral);
@@ -911,6 +967,252 @@ check_sat_response solver::solve()
   
   return !_conflict_set.is_conflict() ? CSR_SAT : CSR_UNSAT;
 }
+
+#ifdef _TRAIL_SAVING
+
+void print_deque(const std::deque<expression> & d)
+{
+  for(unsigned i = 0; i < d.size(); i++)
+    std::cout << d[i] << ", ";
+  std::cout << std::endl;
+}
+
+unsigned calculate_explanation_lbd(const explanation & expl, const trail & tr)
+{
+  static std::unordered_set<unsigned> levels;
+  levels.clear();
+  for(unsigned i = 0; i < expl.size(); i++)
+    levels.insert(tr.get_trail_level(expl[i]));
+  //std::cout << "LBD: " << levels.size() << ", SIZE: " << expl.size() << std::endl;
+  return levels.size();
+}
+
+bool solver::use_saved_trail()
+{
+  while(_ts_pivot < _saved_trail.size())
+    {
+      const expression & l = _saved_trail[_ts_pivot];
+      literal_data * l_data = get_literal_data(l);
+      if(!l_data->has_saved_explanation())
+	{
+	  if(_trail.get_value(l) == EB_TRUE)
+	    _ts_pivot++;
+	  else
+	    return true;
+	}
+      else
+	{
+	  extended_boolean lv = _trail.get_value(l);
+	  if(lv == EB_TRUE)
+	    _ts_pivot++;
+	  else if(lv == EB_FALSE)
+	    {
+	      const explanation & l_expl = l_data->get_saved_explanation();
+	      explanation cflt_expl(nullptr, nullptr);
+	      if(l_expl.is_clause_explanation())
+		{
+		  clause * cl = l_expl.get_clause();
+		  cflt_expl = explanation(this, cl);
+		}
+	      else
+		{
+		  cflt_expl = explanation();
+		  for(unsigned i = 0; i < l_expl.size(); i++)
+		    cflt_expl.push_back(l_expl[i]);
+		  cflt_expl.push_back(l_data->get_opposite());
+		}
+	      apply_conflict(cflt_expl, &_ts_explainer);
+	      _ts_saved_cflts_count++;
+	      return false;
+	    }
+	  else 
+	    {
+	      const explanation & l_expl = l_data->get_saved_explanation();
+	      if(!l_expl.is_clause_explanation() ||
+		 ((!_ts_use_lbd || calculate_explanation_lbd(l_expl, _trail) <= _ts_lbd_limit)
+		  && (!_ts_use_size || l_expl.size() <= _ts_size_limit)))
+		{
+		  apply_propagate(l, &_ts_explainer);
+		  _ts_pivot++;
+		  
+		  _ts_saved_props_count++;
+		}
+	      else
+		return true;
+	    }
+	}     
+    }
+  
+  return true;
+}
+
+void solver::save_trail(unsigned level)
+{
+  if(_ts_use_lookahead)
+    {
+      _ts_force_decides.clear();
+      _should_check_forced_decides = true;
+    }
+      
+  if(_trail.current_level() == _critical_level)
+    {
+      _ts_crit_backtracks_count++;
+      reset_saved_trail();
+    }
+  
+  if(level < _trail.current_level() - 1)
+    {
+      _ts_save_count++;
+      _ts_saved_levels_count += _trail.current_level() - level - 1;
+      if(!_saved_trail.empty())
+	_ts_append_count++;
+    }
+  else
+    _ts_shallow_backtracks_count++;
+
+  
+  if(_critical_level == (unsigned)(-1) || _trail.current_level() - level > 1)
+    _critical_level = level;
+
+  _ts_saved_lits_count += _trail.last_level_start() - _trail.level_start(level + 1);
+  
+  for(int i = _trail.last_level_start() - 1; i >= (int)_trail.level_start(level + 1); i--)
+    {
+      const expression & l = _trail[i];
+      literal_data * l_data = get_literal_data(l);
+      
+      theory_solver * ts = _trail.get_source_theory_solver(l);
+      if(ts != nullptr)
+	{
+	  explanation expl = ts->get_literal_explanation(l);	  
+	  l_data->set_saved_explanation(std::move(expl));
+	}
+      else
+	l_data->reset_saved_explanation();
+      _saved_trail.push_front(l);      
+    }
+  _ts_pivot = 0;
+}
+
+void solver::reset_saved_trail()
+{ 
+  if(!_saved_trail.empty())
+    _ts_reset_count++;
+
+  for(unsigned i = 0; i < _saved_trail.size(); i++)
+    {
+      literal_data * l_data = get_literal_data(_saved_trail[i]);
+      if(l_data->has_saved_explanation() &&
+	 (_trail.get_value(_saved_trail[i]) != EB_TRUE ||
+	  _trail.get_source_theory_solver(_saved_trail[i]) != &_ts_explainer))	
+	l_data->reset_saved_explanation();      
+    }
+  _saved_trail.clear();
+  _ts_pivot = 0;
+  _critical_level = (unsigned)(-1);  
+}
+
+void solver::confirm_saved_propagations()
+{
+  if(_ts_pivot > 0)
+    {
+      _critical_level = _trail.current_level();
+
+
+      if(_ts_use_lookahead && _ts_force_decides.empty())
+	_should_check_forced_decides = true;
+      
+      for(unsigned i = 0; i < _ts_pivot; i++)
+	{
+	  literal_data * l_data = get_literal_data(_saved_trail[i]);
+	  if(l_data->has_saved_explanation() && _trail.get_source_theory_solver(_saved_trail[i]) != &_ts_explainer)	
+	    l_data->reset_saved_explanation();
+	}
+      _saved_trail.erase(_saved_trail.begin(), _saved_trail.begin() + _ts_pivot);
+      _ts_pivot = 0;
+    }
+  assert(_saved_trail.size() == 0 || !get_literal_data(_saved_trail[0])->has_saved_explanation());
+}
+
+void solver::filter_saved_trail()
+{
+  _ts_filter_count++;
+  
+  std::unordered_map<expression, extended_boolean> _saved_values;
+
+  unsigned i,k;
+  for(i = 0, k = 0; i < _saved_trail.size(); i++)
+    {
+      const expression & lit = _saved_trail[i];
+      literal_data * l_data = get_literal_data(lit);
+      const expression & var = l_data->get_positive();
+      extended_boolean saved_var_eb = EB_UNDEFINED;
+      auto it = _saved_values.find(var);
+      if(it != _saved_values.end())
+	saved_var_eb = it->second;
+      extended_boolean saved_lit_eb = l_data->is_positive() ? saved_var_eb : opposite_value(saved_var_eb);
+      if(saved_lit_eb == EB_TRUE)
+	continue;
+
+      _saved_trail[k++] = lit;
+      
+      if(saved_lit_eb == EB_FALSE)
+	break;
+      
+      _saved_values[var] = l_data->is_positive() ? EB_TRUE : EB_FALSE;
+
+    }
+  
+  for(unsigned j = i + 1; j < _saved_trail.size(); j++)
+    {
+      literal_data * l_data = get_literal_data(_saved_trail[j]);
+      extended_boolean saved_lit_eb = EB_UNDEFINED;
+      auto it = _saved_values.find(l_data->get_positive());
+      if(it != _saved_values.end())
+	saved_lit_eb = l_data->is_positive() ? it->second : opposite_value(it->second);
+      
+      if(l_data->has_saved_explanation() &&
+	 saved_lit_eb != EB_TRUE && _saved_trail[j] != _saved_trail[k - 1] && 
+	 (_trail.get_value(_saved_trail[j]) != EB_TRUE ||
+	  _trail.get_source_theory_solver(_saved_trail[j]) != &_ts_explainer))	
+	l_data->reset_saved_explanation();      
+    }
+  _saved_trail.resize(k);
+}
+
+void solver::saved_conflict_lookahead()
+{
+  unsigned dec_count = 0;
+  _should_check_forced_decides = false;
+  for(unsigned i = 0; i < _saved_trail.size(); i++)
+    {
+      extended_boolean eb = _trail.get_value(_saved_trail[i]);
+      if(!get_literal_data(_saved_trail[i])->has_saved_explanation())
+	{
+	  if(eb == EB_FALSE)
+	    {
+	      _ts_force_decides.clear();
+	      return;
+	    }
+
+	  if(eb == EB_UNDEFINED)
+	    {
+	      if(++dec_count > _ts_lookahead_levels)
+		{
+		  _ts_force_decides.clear();
+		  return;
+		}
+	      _ts_force_decides.push_back(_saved_trail[i]);
+	    }	  
+	  
+	  continue;
+	}
+
+      if(_trail.get_value(_saved_trail[i]) == EB_FALSE)
+	return;
+    }
+}
+#endif
 
 bool solver::verify_assignment()
 {
@@ -945,6 +1247,33 @@ void solver::print_reports(std::ostream & ostr)
 
 solver::~solver()
 {
+#ifdef _TRAIL_SAVING  
+  std::cout << "================== TRAIL SAVING STATISTICS =======================" << std::endl;
+  std::cout << "All propagations count: " << _ts_all_props_count << std::endl;
+  std::cout << "Saved propagations count: " << _ts_saved_props_count << std::endl;
+  std::cout << "Percent of saved propagations: " << ((double)_ts_saved_props_count / _ts_all_props_count * 100) << std::endl;  
+  std::cout << "All conflicts count: " <<  _ts_all_cflts_count << std::endl;
+  std::cout << "Saved conflicts count: " << _ts_saved_cflts_count << std::endl;
+  std::cout << "Percent of saved conflicts: " << ((double)_ts_saved_cflts_count / _ts_all_cflts_count * 100) << std::endl;
+  std::cout << "Save trail count: " <<  _ts_save_count << std::endl;
+  std::cout << "Saved levels cumulative: " <<  _ts_saved_levels_count << std::endl;
+  std::cout << "Average saved levels: " << ((double) _ts_saved_levels_count / _ts_save_count) << std::endl;
+  std::cout << "Saved literals cumulative: " << _ts_saved_lits_count << std::endl;
+  std::cout << "Average saved literals: " << ((double) _ts_saved_lits_count / _ts_save_count) << std::endl;
+  std::cout << "Saved trail append count: " <<  _ts_append_count << std::endl;
+  std::cout << "Saved trail reset count: " <<  _ts_reset_count << std::endl;
+  std::cout << "Saved trail filter count: " <<  _ts_filter_count << std::endl;
+  std::cout << "Critical backjumps count: " <<  _ts_crit_backtracks_count << std::endl;
+  std::cout << "All backjumps count: " <<  _ts_all_backtracks_count << std::endl;
+  std::cout << "Shallow backjumps count: " <<  _ts_shallow_backtracks_count << std::endl;
+  std::cout << "Percent of shallow backjumps: " << ((double)_ts_shallow_backtracks_count / _ts_all_backtracks_count * 100) << std::endl;
+  std::cout << "Percent of critical backjumps: " << ((double)_ts_crit_backtracks_count / _ts_all_backtracks_count *100) << std::endl;
+  std::cout << "All decides count: " << _ts_all_decides_count << std::endl;
+  std::cout << "Lookahead decides count: " << _ts_lookahead_decides_count << std::endl;
+  std::cout << "Percent of lookahead decides: " << ((double)_ts_lookahead_decides_count / _ts_all_decides_count * 100) << std::endl;
+  std::cout << "=================================================================" << std::endl;
+#endif
+  
   if(dynamic_cast<solver_observer *>(_literal_selection_strategy) == 0)
     delete _literal_selection_strategy;
  

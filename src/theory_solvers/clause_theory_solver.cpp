@@ -334,6 +334,10 @@ void clause_theory_solver::check_and_propagate(unsigned layer)
   //  std::cout << "BOOL THEORY: " << layer << std::endl;
   while(!_solver.is_conflict() && _current_trail_pos < _solver.get_trail().size())
     {
+#ifdef _TRAIL_SAVING
+      if(!_solver.use_saved_trail())
+	break;
+#endif
       expression l = _solver.get_trail()[_current_trail_pos++];
       expression lp = _solver.get_literal_data(l)->get_opposite();
       process_watch_list(lp);
@@ -341,13 +345,19 @@ void clause_theory_solver::check_and_propagate(unsigned layer)
   _check_and_prop_time_spent.acumulate();
 }
 
-void clause_theory_solver::explain_literal(const expression & l)
+explanation clause_theory_solver::get_literal_explanation(const expression & l)
 {
-  _explain_time_spent.start();
   clause_theory_solver_data * l_data = _data.get_data(l);
   clause * reason_clause = l_data->get_reason_clause();
   unsigned index = l_data->get_index();
-  _solver.apply_explain(l, explanation(&_solver, reason_clause, index));
+  return explanation(&_solver, reason_clause, index);
+}
+
+
+void clause_theory_solver::explain_literal(const expression & l)
+{
+  _explain_time_spent.start();
+  _solver.apply_explain(l, get_literal_explanation(l));
   _explain_time_spent.acumulate();
 }
 

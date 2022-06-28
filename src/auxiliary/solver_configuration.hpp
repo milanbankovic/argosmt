@@ -45,6 +45,15 @@ private:
   int _upper_predefined_csp_bound;
   unsigned _quantifier_instantiation_count_limit;
   unsigned _quantifier_instantiation_term_size_limit;
+
+#ifdef _TRAIL_SAVING
+  bool _ts_use_reason_lbd_filtering = false;
+  unsigned _ts_lbd_limit = 4;
+  bool _ts_use_reason_size_filtering = false;
+  unsigned _ts_size_limit = 10;
+  bool _ts_use_lookahead = false;
+  unsigned _ts_lookahead_levels = 2;
+#endif
   
   static int skip_spaces(std::istream & istr)
   {
@@ -179,6 +188,39 @@ public:
   {
     return _quantifier_instantiation_term_size_limit;
   }
+
+#ifdef _TRAIL_SAVING
+  bool ts_use_reason_lbd_filtering() const
+  {
+    return _ts_use_reason_lbd_filtering;
+  }
+
+  unsigned ts_lbd_limit() const
+  {
+    return _ts_lbd_limit;
+  }
+
+  bool ts_use_reason_size_filtering() const
+  {
+    return _ts_use_reason_size_filtering;
+  }
+  
+  unsigned ts_size_limit() const
+  {
+    return _ts_size_limit;
+  }
+
+  bool ts_use_lookahead() const
+  {
+    return _ts_use_lookahead;
+  }
+
+  unsigned ts_lookahead_levels() const
+  {
+    return _ts_lookahead_levels;
+  }
+#endif
+  
 };
 
 #endif // _SOLVER_CONFIGURATION_H

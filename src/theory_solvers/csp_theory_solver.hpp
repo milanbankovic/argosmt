@@ -427,7 +427,10 @@ public:
   virtual void add_literal(const expression & l_pos, const expression & l_neg);
   virtual void new_level();
   virtual void backjump(unsigned level); 
-  virtual void check_and_propagate(unsigned layer);   
+  virtual void check_and_propagate(unsigned layer);
+
+  virtual explanation get_literal_explanation(const expression & l);
+  
   virtual void explain_literal(const expression & l);
   
   virtual bool is_owned_expression(const expression & e)

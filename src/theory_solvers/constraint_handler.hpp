@@ -164,7 +164,7 @@ public:
   virtual void backjump(unsigned level) = 0;
   virtual void assert_literal(const expression & l) = 0;
   virtual void check_and_propagate(unsigned layer) = 0;
-  virtual void explain_literal(const expression & l) = 0;
+  virtual explanation get_literal_explanation(const expression & l) = 0;
 
   virtual int get_variable_value_hint(const expression & var) = 0;
   virtual bool is_weaker_from_pos(const expression & c) = 0;

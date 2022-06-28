@@ -540,10 +540,16 @@ void csp_theory_solver::check_and_propagate(unsigned layer)
   _check_and_prop_time_spent.acumulate();
 }
 
+explanation csp_theory_solver::get_literal_explanation(const expression & l)
+{
+  return _data.get_data(l)->get_explanation_handler()->get_literal_explanation(l);
+}
+
+
 void csp_theory_solver::explain_literal(const expression & l) 
 {
   _explain_time_spent.start();
-  _data.get_data(l)->get_explanation_handler()->explain_literal(l);
+  _solver.apply_explain(l, get_literal_explanation(l));
   _explain_time_spent.acumulate();
 }
 

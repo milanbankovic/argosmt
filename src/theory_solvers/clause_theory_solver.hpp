@@ -69,9 +69,8 @@ private:
     unsigned get_index() const
     {
       return _index;
-    }    
+    }
   };
-
   struct on_push {
     void operator () (clause * cl) const
     {
@@ -166,6 +165,8 @@ public:
 
   virtual void check_and_propagate(unsigned layer); 
 
+  virtual explanation get_literal_explanation(const expression & l);
+  
   virtual void explain_literal(const expression & l);
 
   virtual bool is_owned_expression(const expression & e)

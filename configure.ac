@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([argosmt], [current], [milan@matf.bg.ac.rs])
+AC_INIT([argosmt], [2022.04.18-ts], [milan@matf.bg.ac.rs])
 AC_CONFIG_SRCDIR([src/argosmt.cpp])
 AC_CONFIG_HEADERS([config.h])
 
@@ -169,6 +169,19 @@ if test "x$use_kat" = "xyes" ; then
       echo "-------------------------------------"
       CXXFLAGS+=" -D_USE_KATSIRELOS_EXPLANATIONS"
 fi
+
+trail_saving=no
+AC_ARG_ENABLE([trail-saving], [AC_HELP_STRING([--enable-trail-saving],
+    [build with trail saving enabled (default NO)])],
+    [trail_saving=$enableval])
+
+if test "x$trail_saving" = "xyes" ; then
+      echo "-------------------------------------"
+      echo "-   using trail saving              -"
+      echo "-------------------------------------"
+      CXXFLAGS+=" -D_TRAIL_SAVING"
+fi
+
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile

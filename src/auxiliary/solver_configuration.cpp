@@ -72,6 +72,14 @@ void solver_configuration::print_option_list(std::ostream & ostr)
   ostr << "upper_predefined_csp_bound = <int> (default: 0)" << std::endl;
   ostr << "quantifier_instantiation_count_limit = <unsigned> (default: -1 (no limit))" << std::endl;
   ostr << "quantifier_instantiation_term_size_limit = <unsigned> (default: -1 (no limit))" << std::endl;
+#ifdef _TRAIL_SAVING
+  ostr << "ts_use_reason_lbd_filtering = yes|no (default: no)" << std::endl;
+  ostr << "ts_lbd_limit = <unsigned> (default: 4)" << std::endl;
+  ostr << "ts_use_reason_size_filtering = yes|no (default: no)" << std::endl;
+  ostr << "ts_size_limit = <unsigned> (default: 10)" << std::endl;
+  ostr << "ts_use_lookahead = yes|no (default: no)" << std::endl;
+  ostr << "ts_lookahead_levels = <unsigned> (default: 2)" << std::endl;    
+#endif
 }
 
 
@@ -168,6 +176,44 @@ void solver_configuration::parse_config_file(std::istream & istr)
 	  unsigned limit = atoi(value.c_str());
 	  set_value(_quantifier_instantiation_term_size_limit, limit);
 	}
+#ifdef _TRAIL_SAVING
+      else if(key == "ts_use_reason_lbd_filtering")
+	{
+	  if(value == "yes")
+	    set_value(_ts_use_reason_lbd_filtering, true);
+	  else
+	    set_value(_ts_use_reason_lbd_filtering, false);
+	}
+      else if(key == "ts_lbd_limit")
+	{
+	  unsigned limit = atoi(value.c_str());
+	  set_value(_ts_lbd_limit, limit);
+	}
+      else if(key == "ts_use_reason_size_filtering")
+	{
+	  if(value == "yes")
+	    set_value(_ts_use_reason_size_filtering, true);
+	  else
+	    set_value(_ts_use_reason_size_filtering, false);
+	}
+      else if(key == "ts_size_limit")
+	{
+	  unsigned limit = atoi(value.c_str());
+	  set_value(_ts_size_limit, limit);
+	}
+      else if(key == "ts_use_lookahead")
+	{
+	  if(value == "yes")
+	    set_value(_ts_use_lookahead, true);
+	  else
+	    set_value(_ts_use_lookahead, false);
+	}
+      else if(key == "ts_lookahead_levels")
+	{
+	  unsigned levels = atoi(value.c_str());
+	  set_value(_ts_lookahead_levels, levels);
+	}
+#endif
       else
 	{
 	  std::cout << "WARNING: unknown option: " << key << " (possible typing error)" << std::endl;

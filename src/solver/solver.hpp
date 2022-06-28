@@ -36,6 +36,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "formula_transformer.hpp"
 #include "enumerative_quantifiers_processor.hpp"
 
+#ifdef _TRAIL_SAVING
+#include <deque>
+#include <optional>
+#endif
+
+
 /* Common data assigned to expressions */
 class common_data : public expression_data {
 private:
@@ -111,10 +117,15 @@ private:
     
   // Number of occurrences in initial clauses
   unsigned _occurrence_counter;
-    
+
+  
   // Common literal pair data
   pair_data * _pair_data;
-    
+
+#ifdef _TRAIL_SAVING
+  std::optional<explanation> _expl_opt;
+#endif
+  
 public:
   literal_data(const expression & l_pos,
 	       const expression & l_neg,
@@ -204,7 +215,7 @@ public:
   {
     return _pair_data->_qdata->_insts.find(inst) != _pair_data->_qdata->_insts.end();
   }
-
+  
   void add_instantiation(const expression & inst)
   {
     _pair_data->_qdata->_insts.insert(inst);
@@ -214,6 +225,28 @@ public:
   {
     return _pair_data->_qdata->_insts;
   }
+
+#ifdef _TRAIL_SAVING  
+  bool has_saved_explanation() const
+  {
+    return _expl_opt.has_value();
+  }
+
+  void set_saved_explanation(explanation && expl)
+  {
+    _expl_opt = std::move(expl);
+  }
+
+  void reset_saved_explanation()
+  {
+    _expl_opt.reset();
+  }
+  
+  const explanation & get_saved_explanation() const
+  {
+    return *_expl_opt;
+  }
+#endif
   
   ~literal_data()
   {
@@ -327,6 +360,78 @@ private:
   unsigned get_first_unlocked_index();
 
   expression canonize_literal_rec(const expression & e);
+
+#ifdef _TRAIL_SAVING  
+  std::deque<expression> _saved_trail;  
+  unsigned _critical_level = (unsigned)(-1);
+  unsigned _ts_pivot = 0;
+
+  void save_trail(unsigned level);
+  void reset_saved_trail();
+  void confirm_saved_propagations();
+  void filter_saved_trail();
+  void saved_conflict_lookahead();
+  
+  class ts_explainer : public theory_solver {
+  public:
+    ts_explainer(solver & sl, const std::string & name, unsigned num_of_layers)
+      :theory_solver(sl, name, num_of_layers)
+    {}
+
+    virtual void add_literal(const expression & l_pos, const expression & l_neg) {}
+    virtual void new_level() {}
+    virtual void backjump(unsigned level) {}
+    virtual void check_and_propagate(unsigned layer) {}
+    virtual explanation get_literal_explanation(const expression & l)
+    {
+      literal_data * l_data = _solver.get_literal_data(l);
+      assert(l_data->has_saved_explanation());
+      return l_data->get_saved_explanation();
+    }
+    virtual void explain_literal(const expression & l)
+    {
+      //std::cout << "EXPLAINING SAVED LITERAL: " << l << std::endl;
+      _solver.apply_explain(l, get_literal_explanation(l));
+    }
+    virtual bool is_owned_expression(const expression & e) { return false; }
+    virtual expression canonize_expression(const expression & e) { return expression();}
+    virtual void get_literal_pair(const expression & l, 
+				  expression & l_pos,
+				  expression & l_neg) {}
+    virtual bool verify_assignment(const trail & tr) { return true; }
+    virtual void get_model(const expression_vector & exps) {}
+    virtual void print_report(std::ostream & ostr) {}   
+  };
+  ts_explainer _ts_explainer;
+
+  std::deque<expression> _ts_force_decides;
+  bool _should_check_forced_decides = true;
+
+  
+  bool _ts_use_lbd = false;
+  unsigned _ts_lbd_limit = 4;
+  bool _ts_use_size = false;
+  unsigned _ts_size_limit = 10;
+  bool _ts_use_lookahead = false;
+  unsigned _ts_lookahead_levels = 2;
+   
+  long _ts_all_props_count = 0;
+  long _ts_saved_props_count = 0;
+  long _ts_all_cflts_count = 0;
+  long _ts_saved_cflts_count = 0;
+  long _ts_save_count = 0;
+  long _ts_saved_levels_count = 0;
+  long _ts_saved_lits_count = 0;
+  long _ts_append_count = 0;
+  long _ts_reset_count = 0;
+  long _ts_filter_count = 0;
+  long _ts_crit_backtracks_count = 0;
+  long _ts_all_backtracks_count = 0;
+  long _ts_shallow_backtracks_count = 0;
+  long _ts_all_decides_count = 0;
+  long _ts_lookahead_decides_count = 0;
+#endif 
+
   
 public:
   solver(expression_factory * factory, bool dimacs = false)
@@ -348,6 +453,9 @@ public:
      _formula_transformer(nullptr),
      _quantifier_instantiation_count_limit((unsigned)(-1)),
      _quantifier_instantiation_term_size_limit((unsigned)(-1))
+#ifdef _TRAIL_SAVING
+    ,_ts_explainer(*this, "TS_EXPLAINER", 1)
+#endif
   {
     _literals.reserve(2000);
   }
@@ -616,6 +724,70 @@ public:
   
   check_sat_response solve();
 
+#ifdef _TRAIL_SAVING
+  bool use_saved_trail();
+
+  void set_ts_use_lbd(bool val)
+  {
+    _ts_use_lbd = val;
+  }
+
+  bool get_ts_use_lbd() const
+  {
+    return _ts_use_lbd;
+  }
+
+  void set_ts_lbd_limit(unsigned lim)
+  {
+    _ts_lbd_limit = lim;
+  }
+
+  unsigned get_ts_lbd_limit() const
+  {
+    return _ts_lbd_limit;
+  }
+
+  void set_ts_use_size(bool val)
+  {
+    _ts_use_size = val;
+  }
+
+  bool get_ts_use_size() const
+  {
+    return _ts_use_size;
+  }
+
+  void set_ts_size_limit(unsigned lim)
+  {
+    _ts_size_limit = lim;
+  }
+
+  unsigned get_ts_size_limit() const
+  {
+    return _ts_size_limit;
+  }
+
+  void set_ts_use_lookahead(bool val)
+  {
+    _ts_use_lookahead = val;
+  }
+
+  bool get_ts_use_lookahead() const
+  {
+    return _ts_use_lookahead;
+  }
+
+  void set_ts_lookahead_levels(unsigned lvs)
+  {
+    _ts_lookahead_levels = lvs;
+  }
+
+  unsigned get_ts_lookahead_levels() const
+  {
+    return _ts_lookahead_levels;
+  }
+#endif
+  
   bool is_conflict()
   {
     return _conflict_set.is_conflict();

@@ -106,7 +106,23 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
   _solver->set_quantifier_instantiation_count_limit(quantifier_instantiation_count_limit);
   _solver->set_quantifier_instantiation_term_size_limit(quantifier_instantiation_term_size_limit);
 
+
+#ifdef _TRAIL_SAVING
+  bool use_lbd = s_config.ts_use_reason_lbd_filtering();
+  unsigned lbd_limit = s_config.ts_lbd_limit();
+  bool use_size = s_config.ts_use_reason_size_filtering();
+  unsigned size_limit = s_config.ts_size_limit();
+  bool use_lookahead = s_config.ts_use_lookahead();
+  unsigned lookahead_levels = s_config.ts_lookahead_levels();
   
+  _solver->set_ts_use_lbd(use_lbd);
+  _solver->set_ts_lbd_limit(lbd_limit);
+  _solver->set_ts_use_size(use_size);
+  _solver->set_ts_size_limit(size_limit);
+  _solver->set_ts_use_lookahead(use_lookahead);
+  _solver->set_ts_lookahead_levels(lookahead_levels);
+#endif
+
   /* Adding theories */
   symbol s = _smt_lib_api->get_logic_symbol();
   if(s == "QF_UF")

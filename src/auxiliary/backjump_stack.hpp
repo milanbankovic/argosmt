@@ -65,6 +65,22 @@ public:
     on_pop(_elements.back());
     _elements.pop_back();
   }
+
+  unsigned level_start(unsigned i) const
+  {
+    return _levels[i];
+  }
+
+  bool is_level_empty(unsigned i) const
+  {
+    return i != current_level() ?
+      _levels[i] == _levels[i + 1] : _levels.back() == _elements.size();
+  }
+
+  unsigned last_level_start() const
+  {
+    return _levels.back();
+  }
   
   bool is_last_level_empty() const 
   {

@@ -29,6 +29,10 @@ private:
   double _activity;
   bool _is_learnt;
   bool _is_locked;
+#ifdef _TRAIL_SAVING
+  unsigned _expl_obj_count = 0;
+#endif
+ 
   unsigned _index;
 public:
   
@@ -204,6 +208,22 @@ public:
   {
     _is_locked = value;
   }
+#ifdef _TRAIL_SAVING
+  unsigned get_expl_obj_count() const
+  {
+    return _expl_obj_count;
+  }
+
+  void increment_expl_obj_count()
+  {
+    _expl_obj_count++;
+  }
+
+  void decrement_expl_obj_count()
+  {
+    _expl_obj_count--;
+  }
+#endif
   
   unsigned get_index() const
   {

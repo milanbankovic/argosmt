@@ -98,7 +98,10 @@ public:
      periodically check for propagations and conflicts at some
      layer. */
   virtual void check_and_propagate(unsigned layer) = 0;
- 
+
+  /* Asks the theory solver to generate explanation of the literal l */
+  virtual explanation get_literal_explanation(const expression & l) = 0;
+  
   /* Asks the theory solver to explain the literal l. The theory
      solver should generate explanation and then apply Explain rule */
   virtual void explain_literal(const expression & l) = 0;

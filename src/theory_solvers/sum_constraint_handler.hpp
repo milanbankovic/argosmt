@@ -126,7 +126,7 @@ public:
   virtual void backjump(unsigned level) {}
   virtual void assert_literal(const expression & l) {}
   virtual void check_and_propagate(unsigned layer);
-  virtual void explain_literal(const expression & l);
+  virtual explanation get_literal_explanation(const expression & l);
 
   virtual int get_variable_value_hint(const expression & var);
   virtual bool is_weaker_from_pos(const expression & c);

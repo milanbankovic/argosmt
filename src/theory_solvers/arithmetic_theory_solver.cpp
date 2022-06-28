@@ -443,14 +443,20 @@ void arithmetic_theory_solver::backjump(unsigned level)
   _backjump_time_spent.acumulate();
 }
 
+explanation arithmetic_theory_solver::get_literal_explanation(const expression & l)
+{
+  arithmetic_theory_solver_data * l_data = _data.get_data(l);
+  if(l_data->has_constraint_data())
+    return l_data->literal_explanation();
+  else
+    return explanation();  
+}
+
+
 void arithmetic_theory_solver::explain_literal(const expression & l)
 {
   _explain_time_spent.start();
-  arithmetic_theory_solver_data * l_data = _data.get_data(l);
-  if(l_data->has_constraint_data())
-    _solver.apply_explain(l, l_data->literal_explanation());
-  else
-    _solver.apply_explain(l, explanation());
+  _solver.apply_explain(l, get_literal_explanation(l));
   _explain_time_spent.acumulate();
 }
 
@@ -461,6 +467,10 @@ void arithmetic_theory_solver::process_assertions()
   
   while(!_solver.is_conflict() && _current_assertion_pos < _solver.get_trail().size())
     {
+#ifdef _TRAIL_SAVING
+      if(!_solver.use_saved_trail())
+	break;
+#endif      
       expression l = _solver.get_trail()[_current_assertion_pos++];
 
       if(!_solver.get_literal_data(l)->is_observing_theory_solver(this))

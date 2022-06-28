@@ -2298,7 +2298,7 @@ void sum_constraint_handler::check_and_propagate(unsigned layer)
   _theory_solver->process_main_trail();
 }
 
-void sum_constraint_handler::explain_literal(const expression & l) 
+explanation sum_constraint_handler::get_literal_explanation(const expression & l) 
 {
   assert(_theory_solver->has_theory_solver_data(l));
   explanation expl;
@@ -2320,7 +2320,7 @@ void sum_constraint_handler::explain_literal(const expression & l)
     {
       generate_propagation_explanation(l, expl);
     }
-  _theory_solver->get_solver().apply_explain(l, expl);
+  return expl;
 }
 
 void sum_constraint_handler::generate_self_explanation(explanation & expl)

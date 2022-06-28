@@ -912,12 +912,12 @@ void domain_handler::explain_domain_at_trail_size(unsigned size, explanation & e
   wrapper.export_to_expl(expl);
 }
 
-void domain_handler::explain_literal(const expression & l) 
+explanation domain_handler::get_literal_explanation(const expression & l) 
 {
   explanation expl;
   //  std::cout << "Explaining from domain: " << _var << std::endl;
   generate_explanation(l, expl);
-  _theory_solver->get_solver().apply_explain(l, expl);
+  return expl;
 }
   
 void domain_handler::backjump(unsigned level)

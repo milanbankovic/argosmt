@@ -1075,6 +1075,8 @@ public:
   virtual void backjump(unsigned level); 
 
   virtual void check_and_propagate(unsigned layer);
+
+  virtual explanation get_literal_explanation(const expression & l);
   
   virtual void explain_literal(const expression & l);
   

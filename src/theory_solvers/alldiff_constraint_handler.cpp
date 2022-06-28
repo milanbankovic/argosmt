@@ -733,7 +733,7 @@ void alldiff_constraint_handler::check_and_propagate(unsigned layer)
   _theory_solver->process_main_trail();
 }
 
-void alldiff_constraint_handler::explain_literal(const expression & l) 
+explanation alldiff_constraint_handler::get_literal_explanation(const expression & l) 
 {
   assert(_theory_solver->has_theory_solver_data(l));
   explanation expl;
@@ -757,7 +757,7 @@ void alldiff_constraint_handler::explain_literal(const expression & l)
       generate_explanation_kat(l, expl);
 #endif
     }
-  _theory_solver->get_solver().apply_explain(l, expl);
+  return expl;
 }
 
 void alldiff_constraint_handler::generate_self_explanation(explanation & expl)
