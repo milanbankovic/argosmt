@@ -13,8 +13,16 @@ included in the future.
 **IMPORTANT:** An experimental support for trail saving (as described
 by [Hickey &
 Bacchus](https://link.springer.com/chapter/10.1007/978-3-030-51825-7_4))
-is available within `ts` branch of this project. Please, consult the
-version of README.md document within `ts` branch for further details.
+is available within [ts](https://github.com/milanbankovic/argosmt/tree/ts) branch of this project. Please, consult the
+version of README.md document within [ts](https://github.com/milanbankovic/argosmt/tree/ts) branch for further details.
+
+---
+
+## How to download
+
+The simplest way is to use `git` command-line tool:
+
+	git clone https://github.com/milanbankovic/argosmt
 
 ---
 
@@ -22,8 +30,7 @@ version of README.md document within `ts` branch for further details.
 
 To compile the solver (under Linux), you should run the following commands:
 
-	tar xzvf argosmt-ts.tar.gz
-	cd argosmt-ts/
+	cd argosmt/
 	./configure --enable-hybrid-long-values
 	make	
 
