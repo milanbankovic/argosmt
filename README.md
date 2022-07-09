@@ -10,6 +10,12 @@ The solver currently supports EUF, LRA and LIA theories, as well as
 their combinations. Other theory solvers are also planned to be
 included in the future.
 
+**IMPORTANT:** An experimental support for trail saving (as described
+by [Hickey &
+Bacchus](https://link.springer.com/chapter/10.1007/978-3-030-51825-7_4))
+is available within `ts` branch of this project. Please, consult the
+version of README.md document within `ts` branch for further details.
+
 ---
 
 ## How to compile
