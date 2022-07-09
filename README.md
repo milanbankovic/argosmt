@@ -15,12 +15,20 @@ method, as described by [Hickey & Bacchus](https://link.springer.com/chapter/10.
 
 ---
 
+## How to download
+
+The simplest way is to use `git` command-line tool:
+
+    git clone https://github.com/milanbankovic/argosmt
+
+---
+
 ## How to compile
 
 To compile the solver (under Linux), you should run the following commands:
 
-	tar xzvf argosmt-ts.tar.gz
-	cd argosmt-ts/
+	cd argosmt/
+	git checkout ts
 	./configure --enable-hybrid-long-values
 	make	
 
@@ -32,6 +40,8 @@ More configuration options can be inspected with:
 it, configure the solver with the `--enable-trail-saving` option:
 
     ./configure --enable-hybrid-long-values --enable-trail-saving
+
+before compilation with the `make` command.
 
 ---
 
