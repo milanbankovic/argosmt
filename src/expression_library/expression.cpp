@@ -321,12 +321,11 @@ expression function_expression_node::
 expand_expression(const signature * sg,
 		  search_mode smode) const
 {
-
   expression_vector expanded_operands;
   for(expression_vector::const_iterator it = _operands->begin(), 
 	it_end = _operands->end(); it != it_end; ++it)
     {
-      expanded_operands.push_back((*it)->expand_expression(sg, smode));
+      expanded_operands.push_back((*it)->expand_expression_cached(sg, smode));
     }
 
   sort sr = _sort; 
@@ -360,20 +359,24 @@ expand_expression(const signature * sg,
       const sorted_variable_vector & vars = def.get_variables();
       expression def_exp = def.get_expression();
 
-      substitution sub;
-      sorted_variable_vector::const_iterator 
-	vit = vars.begin(), 
-	vit_end = vars.end();
-      expression_vector::const_iterator eit = expanded_operands.begin();
-
-      assert(vars.size() == expanded_operands.size());
-      
-      for(; vit != vit_end; ++vit, ++eit)
+      if(!vars.empty())
 	{
-	  sub.insert(std::make_pair(vit->get_variable(), *eit)); 
-	}
+	  substitution sub;
+	  sorted_variable_vector::const_iterator 
+	    vit = vars.begin(), 
+	    vit_end = vars.end();
+	  expression_vector::const_iterator eit = expanded_operands.begin();
 
-      return def_exp->expand_expression(sg, smode)->get_instance(sub);
+	  assert(vars.size() == expanded_operands.size());
+      
+	  for(; vit != vit_end; ++vit, ++eit)
+	    {
+	      sub.insert(std::make_pair(vit->get_variable(), *eit)); 
+	    }
+	  return def_exp->expand_expression_cached(sg, smode)->get_instance(sub);
+	}
+      else
+	return def_exp->expand_expression_cached(sg, smode);
     }
   else
     return _factory->create_expression(_symbol, std::move(expanded_operands), 
@@ -770,7 +773,7 @@ expression quantifier_expression_node::infer_sorts() const
 expression quantifier_expression_node::
 expand_expression(const signature * sg,
 		  search_mode smode) const
-{ 
+{
   sorted_variable_vector exp_vars;
     
   for(sorted_variable_vector::const_iterator it = _vars->begin(),
@@ -782,7 +785,7 @@ expand_expression(const signature * sg,
     }
     
 
-  expression expanded_expr = _expr->expand_expression(sg, smode);
+  expression expanded_expr = _expr->expand_expression_cached(sg, smode);
 
   if(!expanded_expr->get_sort()->
      is_equivalent(_factory->get_signature()->get_sort_factory()->BOOL_SORT()))
@@ -1080,12 +1083,11 @@ expand_expression(const signature * sg,
     {
       expanded_bind.push_back(variable_binding(it->get_variable(),
 					       it->get_expression()->
-					       expand_expression(sg, 
-								 smode)));
+					       expand_expression_cached(sg, smode)));
     }
   return _factory->create_expression(std::move(expanded_bind), 
 				     _expr->
-				     expand_expression(sg, smode));
+				     expand_expression_cached(sg, smode));
 }
 
 

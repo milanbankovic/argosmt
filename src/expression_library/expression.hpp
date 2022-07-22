@@ -234,12 +234,16 @@ class expression_node :
 protected:
   expression_factory * _factory;
   attribute_set * _attributes;
-
+  
   std::size_t _hash_code;
 
   expression _assigned;
+  mutable expression _expanded;
+  
   expression_data * _expression_data;
 
+
+  
   bool sorts_equal(const sort & s1, const sort & s2) const;
     
   /** Constructor is protected. */
@@ -451,6 +455,10 @@ public:
   expand_expression(const signature * sg,
 		    search_mode smode = S_CONTEXTUAL) const = 0;
 
+
+  expression expand_expression_cached(const signature * sg,
+				      search_mode smode) const;
+  
   /** Expands expression with respect to the main signature and 
       _contextual_ search mode (default mode). */
   expression expand_expression() const;
@@ -1659,6 +1667,7 @@ expression_node::expression_node(expression_factory * factory)
    _attributes(0),
    _hash_code(0),
    _assigned(factory->UNDEFINED_EXPRESSION()),
+   _expanded(factory->UNDEFINED_EXPRESSION()),
    _expression_data(0)
 {}
 
@@ -1824,9 +1833,22 @@ std::string expression_node::to_string() const
 }
 
 inline
+expression
+expression_node::expand_expression_cached(const signature * sg,
+					  search_mode smode) const
+{
+  if(_expanded != _factory->UNDEFINED_EXPRESSION())
+    {
+      return _expanded;
+    }
+  return (_expanded = expand_expression(sg, smode));
+}
+
+
+inline
 expression expression_node::expand_expression() const
 {
-  return this->expand_expression(_factory->get_signature(), S_CONTEXTUAL);
+  return this->expand_expression_cached(_factory->get_signature(), S_CONTEXTUAL);
 }
 
 
