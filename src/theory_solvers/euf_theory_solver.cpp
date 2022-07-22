@@ -572,10 +572,10 @@ bool euf_theory_solver::get_simplest_in_class(const expression & e, expression &
 
 bool euf_theory_solver::check_literal_relevancy(const expression & e)
 {
-  if((e->is_not() && check_term_relevancy(e->get_operands()[0])) || check_term_relevancy(e))
+  if(check_term_relevancy(e))
     return true;
 
-  if(!e->is_equality() && !e->is_disequality())
+  if(!e->is_equality())
     return false;
 
   return check_term_relevancy(e->get_operands()[0]) && check_term_relevancy(e->get_operands()[1]);
@@ -584,6 +584,9 @@ bool euf_theory_solver::check_literal_relevancy(const expression & e)
 bool euf_theory_solver::check_term_relevancy(const expression & e)
 {
   if(e->is_equality() || e->is_disequality() || e->is_not())
+    return false;
+
+  if(_solver.has_literal_data(e) && _solver.get_literal_data(e)->is_negative())
     return false;
 
   common_data * e_data = _solver.get_common_data(e);
@@ -614,6 +617,7 @@ void euf_theory_solver::apply_trivial_propagation(const expression & l)
 
 void euf_theory_solver::process_assertion(const expression & l)
 {
+  literal_data * ldata = nullptr;
   
   if(l->is_equality())
     {
@@ -640,9 +644,9 @@ void euf_theory_solver::process_assertion(const expression & l)
 	  check_diseq_propagations(l_list, r_list, l);
 	}
     }
-  else if(l->is_not())
+  else if((ldata = _solver.get_literal_data(l))->is_negative())
     {
-      expression lp = l->get_operands()[0];
+      expression lp = ldata->get_opposite();
       _predicate_propagation_causes[lp] = lp;
       const expression_vector & lcl = _data.get_data(_data.get_data(lp)->get_representative())->get_class_list();
       for(unsigned i = 0; i < lcl.size(); i++)
@@ -867,7 +871,8 @@ void euf_theory_solver::explain_disequality(const expression & diseq, explanatio
 
 void euf_theory_solver::explain_predicate(const expression & pred, explanation & expl)
 {
-  expression e = pred->is_not() ? pred->get_operands()[0] : pred;
+  literal_data *ldata = _solver.get_literal_data(pred);
+  expression e = ldata->is_negative() ? ldata->get_opposite() : pred;
 
   assert(_solver.has_literal_data(e) &&
 	 !_solver.get_trail().is_undefined(e));
