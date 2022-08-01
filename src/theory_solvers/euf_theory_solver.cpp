@@ -92,10 +92,8 @@ void euf_theory_solver::new_expression(const expression & e)
   // return;
 
   if(_solver.has_literal_data(e))
-    {
-      _data.get_data(e)->set_representing_literal(e);
-    }
-
+    _predicate_propagation_causes[e] = e;
+  
   lookup_key rft = get_lookup_key(e);
 
   lookup_table::const_iterator it = lookup().find(rft);
@@ -197,7 +195,7 @@ process_pending_unions(std::queue<expression_pair> & pending_unions, bool explai
 }
 
 void euf_theory_solver::check_eq_propagations(const expression_vector & cl1,
-				       const expression_vector & cl2)
+					      const expression_vector & cl2)
 {
   for(unsigned i = 0; i < cl1.size(); i++)
     for(unsigned j = 0; j < cl2.size(); j++)
@@ -225,8 +223,8 @@ void euf_theory_solver::check_eq_propagations(const expression_vector & cl1,
 }
 
 void euf_theory_solver::check_diseq_propagations(const expression_vector & cl1,
-					  const expression_vector & cl2,
-					  const expression & cdiseq)
+						 const expression_vector & cl2,
+						 const expression & cdiseq)
 {
   for(unsigned i = 0; i < cl1.size(); i++)
     for(unsigned j = 0; j < cl2.size(); j++)
@@ -243,10 +241,11 @@ void euf_theory_solver::check_diseq_propagations(const expression_vector & cl1,
 
 	    if(diseq_value != EB_TRUE)
 	      {
-		_disequality_propagation_causes[diseq] = cdiseq;
+		bool swapped = le != eq->get_operands()[0];
+		_disequality_propagation_causes[diseq] = { cdiseq, swapped };
 	      }
 
-	    if(diseq_value == EB_UNDEFINED)
+	    if(diseq_value == EB_UNDEFINED)	      
 	      _solver.apply_propagate(diseq, this);
 	    else if(diseq_value == EB_FALSE)
 	      {
@@ -274,7 +273,7 @@ expression euf_theory_solver::find_common_ancestor(expression_to_expression_map 
     {
       a = proof_state[p];
       path_marker[a] = true;
-      p = _data.get_data(a)->get_proof_forest().parent();
+      p = _data.get_data(a)->get_proof_forest().parent();     
     }
 
   b = proof_state[b];
@@ -287,10 +286,10 @@ expression euf_theory_solver::find_common_ancestor(expression_to_expression_map 
 
 void
 euf_theory_solver::explain_along_path(expression_to_expression_map & proof_state,
-			       expression_to_vector_map & class_lists,
-			       std::vector<expression_pair> & expl_output,
-			       std::queue<expression_pair> & pending_proofs,
-			       expression a, expression c)
+				      expression_to_vector_map & class_lists,
+				      std::vector<expression_pair> & expl_output,
+				      std::queue<expression_pair> & pending_proofs,
+				      expression a, expression c)
 {
   a = proof_state[a];
   expression b;
@@ -323,7 +322,7 @@ euf_theory_solver::explain_along_path(expression_to_expression_map & proof_state
 }
 
 void euf_theory_solver::explain(const expression & c1, const expression & c2,
-			 std::vector<expression_pair> & expl_output)
+				std::vector<expression_pair> & expl_output)
 
 {
   expression_to_expression_map proof_state;
@@ -418,31 +417,24 @@ expression euf_theory_solver::canonize_eq_diseq(const expression & l)
 
 void euf_theory_solver::check_predicate_propagations(const expression & ra, const expression & rb)
 {
-
-  if(!_data.get_data(ra)->has_representing_literal())
+  if(!_solver.has_literal_data(ra) || !_solver.has_literal_data(rb))
     return;
-
-  if(!_data.get_data(rb)->has_representing_literal())
+  
+  const extended_boolean ra_value = _solver.get_trail().get_value(ra);
+  const extended_boolean rb_value = _solver.get_trail().get_value(rb);
+  expression rac = _solver.get_trail().get_source_theory_solver(ra) == this ? _predicate_propagation_causes[ra] : ra;
+  expression rbc = _solver.get_trail().get_source_theory_solver(rb) == this ? _predicate_propagation_causes[rb] : rb;
+  literal_data * rac_data = _solver.get_literal_data(rac);
+  literal_data * rbc_data = _solver.get_literal_data(rbc);
+  
+  if(ra_value == EB_TRUE)
     {
-      _data.get_data(rb)->set_representing_literal(_data.get_data(ra)->get_representing_literal());
-      return;
-    }
-
-  const expression & ral = _data.get_data(ra)->get_representing_literal();
-  const expression & rbl = _data.get_data(rb)->get_representing_literal();
-  const extended_boolean ral_value = _solver.get_trail().get_value(ral);
-  const extended_boolean rbl_value = _solver.get_trail().get_value(rbl);
-  literal_data * ral_data = _solver.get_literal_data(ral);
-  literal_data * rbl_data = _solver.get_literal_data(rbl);
-
-  if(ral_value == EB_TRUE)
-    {
-      if(rbl_value == EB_TRUE)
+      if(rb_value == EB_TRUE)
 	return;
-      else if(rbl_value == EB_FALSE)
-	{
+      else if(rb_value == EB_FALSE)
+	{	  
 	  explanation expl;
-	  explain_conflict(ral, rbl, expl, ral, rbl_data->get_opposite());
+	  explain_conflict(rac, rbc, expl, rac, rbc_data->get_opposite());
 	  _solver.apply_conflict(expl, this);
 	  return;
 	}
@@ -454,27 +446,29 @@ void euf_theory_solver::check_predicate_propagations(const expression & ra, cons
 	      {
 		const extended_boolean clbi_value = _solver.get_trail().get_value(clb[i]);
 		if(clbi_value == EB_UNDEFINED)
-		  _solver.apply_propagate(clb[i], this);
+		  {
+		    _predicate_propagation_causes[clb[i]] = rac;
+		    _solver.apply_propagate(clb[i], this);
+		  }
 		else if(clbi_value == EB_FALSE)
 		  {
 		    explanation expl;
-		    explain_conflict(ral, clb[i], expl, ral, _solver.get_literal_data(clb[i])->get_opposite());
+		    explain_conflict(rac, clb[i], expl, rac, _solver.get_literal_data(clb[i])->get_opposite());
 		    _solver.apply_conflict(expl, this);
 		    return;
 		  }
 	      }
-	  _data.get_data(rb)->set_representing_literal(ral);
 	  return;
 	}
     }
-  else if(ral_value == EB_FALSE)
+  else if(ra_value == EB_FALSE)
     {
-      if(rbl_value == EB_FALSE)
+      if(rb_value == EB_FALSE)
 	return;
-      else if(rbl_value == EB_TRUE)
+      else if(rb_value == EB_TRUE)
 	{
 	  explanation expl;
-	  explain_conflict(ral, rbl, expl, ral_data->get_opposite(), rbl);
+	  explain_conflict(rac, rbc, expl, rac_data->get_opposite(), rbc);
 	  _solver.apply_conflict(expl, this);
 	  return;
 	}
@@ -487,22 +481,24 @@ void euf_theory_solver::check_predicate_propagations(const expression & ra, cons
 		const expression & op = _solver.get_literal_data(clb[i])->get_opposite();
 		const extended_boolean op_value = _solver.get_trail().get_value(op);
 		if(op_value == EB_UNDEFINED)
-		  _solver.apply_propagate(op, this);
+		  {
+		    _predicate_propagation_causes[clb[i]] = rac;
+		    _solver.apply_propagate(op, this);
+		  }
 		else if(op_value == EB_FALSE)
 		  {
 		    explanation expl;
-		    explain_conflict(ral, clb[i], expl, ral_data->get_opposite(), clb[i]);
+		    explain_conflict(rac, clb[i], expl, rac_data->get_opposite(), clb[i]);
 		    _solver.apply_conflict(expl, this);
 		    return;
 		  }
 	      }
-	  _data.get_data(rb)->set_representing_literal(ral);
 	  return;
 	}
     }
   else // undefined
     {
-      if(rbl_value == EB_TRUE)
+      if(rb_value == EB_TRUE)
 	{
 	  const expression_vector & cla = _data.get_data(ra)->get_class_list();
 	  for(unsigned i = 0; i < cla.size(); i++)
@@ -510,18 +506,21 @@ void euf_theory_solver::check_predicate_propagations(const expression & ra, cons
 	      {
 		const extended_boolean clai_value = _solver.get_trail().get_value(cla[i]);
 		if(clai_value == EB_UNDEFINED)
-		  _solver.apply_propagate(cla[i], this);
+		  {
+		    _predicate_propagation_causes[cla[i]] = rbc;
+		    _solver.apply_propagate(cla[i], this);
+		  }
 		else if(clai_value == EB_FALSE)
 		  {
 		    explanation expl;
-		    explain_conflict(rbl, cla[i], expl, rbl, _solver.get_literal_data(cla[i])->get_opposite());
+		    explain_conflict(rbc, cla[i], expl, rbc, _solver.get_literal_data(cla[i])->get_opposite());
 		    _solver.apply_conflict(expl, this);
 		    return;
 		  }
 	      }
 	  return;
 	}
-      else if(rbl_value == EB_FALSE)
+      else if(rb_value == EB_FALSE)
 	{
 	  const expression_vector & cla = _data.get_data(ra)->get_class_list();
 	  for(unsigned i = 0; i < cla.size(); i++)
@@ -530,11 +529,14 @@ void euf_theory_solver::check_predicate_propagations(const expression & ra, cons
 		const expression & op = _solver.get_literal_data(cla[i])->get_opposite();
 		const extended_boolean op_value = _solver.get_trail().get_value(op);
 		if(op_value == EB_UNDEFINED)
-		  _solver.apply_propagate(op, this);
+		  {
+		    _predicate_propagation_causes[cla[i]] = rbc;
+		    _solver.apply_propagate(op, this);
+		  }
 		else if(op_value == EB_FALSE)
 		  {
 		    explanation expl;
-		    explain_conflict(rbl, cla[i], expl, rbl_data->get_opposite(), cla[i]);
+		    explain_conflict(rbc, cla[i], expl, rbc_data->get_opposite(), cla[i]);
 		    _solver.apply_conflict(expl, this);
 		    return;
 		  }
@@ -570,10 +572,10 @@ bool euf_theory_solver::get_simplest_in_class(const expression & e, expression &
 
 bool euf_theory_solver::check_literal_relevancy(const expression & e)
 {
-  if((e->is_not() && check_term_relevancy(e->get_operands()[0])) || check_term_relevancy(e))
+  if(check_term_relevancy(e))
     return true;
 
-  if(!e->is_equality() && !e->is_disequality())
+  if(!e->is_equality())
     return false;
 
   return check_term_relevancy(e->get_operands()[0]) && check_term_relevancy(e->get_operands()[1]);
@@ -582,6 +584,9 @@ bool euf_theory_solver::check_literal_relevancy(const expression & e)
 bool euf_theory_solver::check_term_relevancy(const expression & e)
 {
   if(e->is_equality() || e->is_disequality() || e->is_not())
+    return false;
+
+  if(_solver.has_literal_data(e) && _solver.get_literal_data(e)->is_negative())
     return false;
 
   common_data * e_data = _solver.get_common_data(e);
@@ -612,15 +617,20 @@ void euf_theory_solver::apply_trivial_propagation(const expression & l)
 
 void euf_theory_solver::process_assertion(const expression & l)
 {
-  const expression & left = l->get_operands()[0];
-  const expression & right = l->get_operands()[1];
-
+  literal_data * ldata = nullptr;
+  
   if(l->is_equality())
     {
+      const expression & left = l->get_operands()[0];
+      const expression & right = l->get_operands()[1];
+
       merge(left, right);
     }
   else if(l->is_disequality())
     {
+      const expression & left = l->get_operands()[0];
+      const expression & right = l->get_operands()[1];
+
       if(are_congruent(left, right))
 	{
 	  explanation conflicting;
@@ -634,10 +644,10 @@ void euf_theory_solver::process_assertion(const expression & l)
 	  check_diseq_propagations(l_list, r_list, l);
 	}
     }
-  else if(l->is_not())
+  else if((ldata = _solver.get_literal_data(l))->is_negative())
     {
-      expression lp = l->get_operands()[0];
-      _data.get_data(_data.get_data(lp)->get_representative())->set_representing_literal(lp);
+      expression lp = ldata->get_opposite();
+      _predicate_propagation_causes[lp] = lp;
       const expression_vector & lcl = _data.get_data(_data.get_data(lp)->get_representative())->get_class_list();
       for(unsigned i = 0; i < lcl.size(); i++)
 	if(_solver.has_literal_data(lcl[i]))
@@ -645,7 +655,10 @@ void euf_theory_solver::process_assertion(const expression & l)
 	    const expression & op = _solver.get_literal_data(lcl[i])->get_opposite();
 	    const extended_boolean op_value = _solver.get_trail().get_value(op);
 	    if(op_value == EB_UNDEFINED)
-	      _solver.apply_propagate(op, this);
+	      {
+		_predicate_propagation_causes[lcl[i]] = lp;
+		_solver.apply_propagate(op, this);
+	      }
 	    else if(op_value == EB_FALSE)
 	      {
 		explanation expl;
@@ -657,14 +670,17 @@ void euf_theory_solver::process_assertion(const expression & l)
     }
   else
     {
-      _data.get_data(_data.get_data(l)->get_representative())->set_representing_literal(l);
+      _predicate_propagation_causes[l] = l;
       const expression_vector & lcl = _data.get_data(_data.get_data(l)->get_representative())->get_class_list();
       for(unsigned i = 0; i < lcl.size(); i++)
 	if(_solver.has_literal_data(lcl[i]))
 	  {
 	    const extended_boolean lcli_value = _solver.get_trail().get_value(lcl[i]);
 	    if(lcli_value == EB_UNDEFINED)
-	      _solver.apply_propagate(lcl[i], this);
+	      {
+		_predicate_propagation_causes[lcl[i]] = l;
+		_solver.apply_propagate(lcl[i], this);
+	      }
 	    else if(lcli_value == EB_FALSE)
 	      {
 		explanation expl;
@@ -755,29 +771,23 @@ void euf_theory_solver::check_and_propagate(unsigned layer)
   _check_and_prop_time_spent.acumulate();
 }
 
-
-
 void euf_theory_solver::explain_literal(const expression & l)
 {
   _explain_time_spent.start();
+  explanation expl;
   if(l->is_equality())
     {
-      explanation expl;
       explain_equality(l, expl);
-      _solver.apply_explain(l, expl);
     }
   else if(l->is_disequality())
     {
-      explanation expl;
       explain_disequality(l, expl);
-      _solver.apply_explain(l, expl);
     }
   else
     {
-      explanation expl;
       explain_predicate(l, expl);
-      _solver.apply_explain(l, expl);
     }
+  _solver.apply_explain(l, expl);
   _explain_time_spent.acumulate();
 }
 
@@ -791,18 +801,18 @@ void euf_theory_solver::explain_equality(const expression & eq, explanation & ex
   generate_explanation(expl_output, expl);
 }
 
-
 void euf_theory_solver::explain_disequality(const expression & diseq, explanation & expl)
 {
-  const expression & cdiseq = _disequality_propagation_causes[diseq];
+  const dpc_entry & dpc = _disequality_propagation_causes[diseq];
+  const expression & cdiseq = dpc.cdiseq;
   expression le = diseq->get_operands()[0];
   expression re = diseq->get_operands()[1];
   expression cle = cdiseq->get_operands()[0];
   expression cre = cdiseq->get_operands()[1];
-
-  if(_data.get_data(le)->get_representative() != _data.get_data(cle)->get_representative())
-    std::swap(cle, cre);
-
+  
+  if(dpc.swapped)
+    std::swap(cle, cre);      
+  
   assert(_data.get_data(le)->get_representative() == _data.get_data(cle)->get_representative() &&
 	 _data.get_data(re)->get_representative() == _data.get_data(cre)->get_representative());
   
@@ -815,13 +825,14 @@ void euf_theory_solver::explain_disequality(const expression & diseq, explanatio
 
 void euf_theory_solver::explain_predicate(const expression & pred, explanation & expl)
 {
-  expression e = pred->is_not() ? pred->get_operands()[0] : pred;
+  literal_data *ldata = _solver.get_literal_data(pred);
+  expression e = ldata->is_negative() ? ldata->get_opposite() : pred;
 
   assert(_solver.has_literal_data(e) &&
 	 !_solver.get_trail().is_undefined(e));
 
-  const expression & rle = _data.get_data(_data.get_data(e)->get_representative())->get_representing_literal();
-
+  const expression & rle = _predicate_propagation_causes[e]; 
+  
   assert(rle.get() != 0 && _solver.has_literal_data(rle) &&
 	 !_solver.get_trail().is_undefined(rle));
 
@@ -836,7 +847,7 @@ void euf_theory_solver::explain_predicate(const expression & pred, explanation &
 
 
 void euf_theory_solver::explain_conflict(const expression & left, const expression & right, explanation & expl,
-				  const expression & cflt1, const expression & cflt2)
+					 const expression & cflt1, const expression & cflt2)
 {
   std::vector<expression_pair> expl_output;
   explain(left, right, expl_output);

@@ -217,6 +217,26 @@ public:
   {
     return _stack.current_level();
   }
+
+  unsigned level_start(unsigned i) const
+  {
+    return _stack.level_start(i);
+  }
+
+  bool is_level_empty(unsigned i) const
+  {
+    return _stack.is_level_empty(i);
+  }
+
+  unsigned last_level_start() const
+  {
+    return _stack.last_level_start();
+  }
+  
+  bool is_last_level_empty() const 
+  {
+    return _stack.is_last_level_empty();
+  }
   
   void backjump(unsigned level)
   {
