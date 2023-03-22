@@ -89,6 +89,9 @@ public:
 
   expression get_sort_constant(const sort & s)
   {
+    if(s == _sort_factory->BOOL_SORT())
+      return _exp_factory->TRUE_EXPRESSION();
+
     auto it = _sort_constants.find(s);
     if(it != _sort_constants.end())
       return it->second;

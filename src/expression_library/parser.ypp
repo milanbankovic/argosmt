@@ -108,8 +108,8 @@ sorted_variable dummy_var("", sort());
 %type<sort_var_attr> sorted_var
 %type<term_attr> term
 %type<vb_attr> var_binding
-%type<vb_v_attr> var_binding_seq
 %type<vb_v_attr> var_binding_ne_seq
+%type<vb_v_attr> var_binding_ne_seq_par
 %type<term_v_attr> term_seq
 %type<term_v_attr> term_ne_seq
 
@@ -230,10 +230,14 @@ command : '(' RW_SET_LOGIC SYMBOL ')'
 	}
         | '(' RW_DEFINE_FUN function_symbol '(' sorted_var_seq ')' sort term ')'
 	{
+	  std::size_t n = $5->size();
 	  yy_api->define_function(*$3, std::move(*$5), *$7, *$8);
+	  
 	  if(yy_api->print_success())
 	   yy_api->cout() << "success" << std::endl;
-	 
+
+          vars.resize(vars.size() - n, dummy_var);
+
 	  delete $3;
 	  delete $5;
 	  delete $7;
@@ -620,7 +624,7 @@ sorted_var_seq: sorted_var_seq sorted_var
               }	
               | 
 	      {
-	       $$ = new sorted_variable_vector(0, dummy_var);
+	       $$ = new sorted_variable_vector();
 	      }
               ;
 
@@ -711,13 +715,13 @@ term: spec_constant
       delete $5;
       delete $7;
     }
-    | '(' RW_LET '(' var_binding_ne_seq ')' term ')'
+    | '(' RW_LET var_binding_ne_seq_par term ')'
     {
-      std::size_t n = $4->size();
-      $$ = new expression(yy_api->get_expression_factory()->create_expression(std::move(*$4), *$6));
+      std::size_t n = $3->size();
+      $$ = new expression(yy_api->get_expression_factory()->create_expression(std::move(*$3), *$4));
       vars.resize(vars.size() - n, dummy_var);
+      delete $3;
       delete $4;
-      delete $6;
     }
     | '(' RW_FORALL '(' sorted_var_ne_seq ')' term ')'
     {
@@ -752,27 +756,27 @@ var_binding: '(' SYMBOL term ')'
 	   }
            ;
 
-var_binding_seq: var_binding_seq var_binding
+var_binding_ne_seq: var_binding_ne_seq var_binding
 	       {
 	         $$ = $1;
 		 $$->push_back(*$2);
-		 vars.push_back(sorted_variable($2->get_variable(), $2->get_expression()->get_sort()));
 		 delete $2;
 	       }
-               |
+               | var_binding
 	       {
 	         $$ = new variable_binding_vector();
+		 $$->push_back(*$1);
+		 delete $1;
 	       }
                ;
 
-var_binding_ne_seq: var_binding_seq var_binding
+var_binding_ne_seq_par: '(' var_binding_ne_seq ')'
 		 {
-	          $$ = $1;
-		  $$->push_back(*$2);
-        	  vars.push_back(sorted_variable($2->get_variable(), $2->get_expression()->get_sort()));
-		  delete $2;
-	         }    
-                 ;
+                     $$ = $2;
+		     const variable_binding_vector & v = *$2;
+		     for(unsigned i = 0; i < v.size(); i++)
+		       vars.push_back(sorted_variable(v[i].get_variable(), v[i].get_expression()->get_inferred_sort()));		    
+                 }
 
 term_seq: term_seq term
 	{

@@ -346,7 +346,7 @@ public:
   
     get_polynomial_from_relation(e, lp, c, fs);
     
-    if(e->get_operands()[0]->infer_sorts()->get_sort()->get_symbol() == sort_symbol::REAL)
+    if(e->get_operands()[0]->get_inferred_sort()->get_symbol() == sort_symbol::REAL)
       {
 	if(!lp.empty() && lp.begin()->second != 1)
 	  {

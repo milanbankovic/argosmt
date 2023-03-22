@@ -343,7 +343,8 @@ void formula_transformer::cnf_transformation(const expression & expr,
   if(!expr->is_function() || expr->get_operands().empty())
     {
       name = expr;
-      set_sort_constant(expr);
+      if(!expr->is_variable())
+	set_sort_constant(expr);
       return;
     }
 
@@ -636,7 +637,7 @@ void formula_transformer::cnf_transformation(const expression & expr,
 	// C /\ sA \/ ~C /\ sB  <=> 
 	// C \/ sB /\ sA \/ ~C  /\  sA \/ sB <=>
 	// C \/ sB /\ sA \/ ~C  (sA \/ sB is the resolvent)
-	name = get_unique_constant(ite_prefix, expr->infer_sorts()->get_sort());
+	name = get_unique_constant(ite_prefix, expr->get_inferred_sort());
 	expression sA = _exp_factory->create_expression(function_symbol::EQ, name, op_names[1]);
 	expression sB = _exp_factory->create_expression(function_symbol::EQ, name, op_names[2]);
 	const expression & c = op_names[0];

@@ -45,7 +45,7 @@ void enumerative_quantifiers_processor::check_quantifiers()
 	  while(_insts[_curr_inst]._term_index < terms.size())
 	    {
 	      expression term = terms[_insts[_curr_inst]._term_index++];
-	      sort s = term->infer_sorts()->get_sort();
+	      sort s = term->get_inferred_sort();
 	      if(s != _insts[_curr_inst]._sort)
 		continue;
 	      

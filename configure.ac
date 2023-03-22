@@ -100,7 +100,7 @@ LIBS="-lgmp -lgmpxx -lrt"
 
 
 # Choosing value type for unknowns in arithmetics
-unknown_value_type=gmp
+unknown_value_type=hybrid_long
 AC_ARG_ENABLE([gmp-values], [AC_HELP_STRING([--enable-gmp-values],
     [use GMP values in arithmetic theory (default YES)])],
     [test "x$enableval" = "xyes" && unknown_value_type=gmp])

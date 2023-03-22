@@ -4783,7 +4783,7 @@ LIBS="-lgmp -lgmpxx -lrt"
 
 
 # Choosing value type for unknowns in arithmetics
-unknown_value_type=gmp
+unknown_value_type=hybrid_long
 # Check whether --enable-gmp-values was given.
 if test "${enable_gmp_values+set}" = set; then :
   enableval=$enable_gmp_values; test "x$enableval" = "xyes" && unknown_value_type=gmp

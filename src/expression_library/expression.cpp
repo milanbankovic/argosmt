@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2010-2015,2021 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2010-2015,2021-2023 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -31,8 +31,7 @@ const variable_binding_vector
 EMPTY_VARIABLE_BINDING_VECTOR =   variable_binding_vector();
 
 expression_vector function_expression_node::_dummy_expression_vector = expression_vector();
-sorted_variable_vector quantifier_expression_node::_dummy_svar_vector = sorted_variable_vector();
-variable_binding_vector let_expression_node::_dummy_vb_vector = variable_binding_vector();
+
 
 
 const expression_node::iterator & expression_node::iterator::operator ++ ()
@@ -178,8 +177,7 @@ is_instance(const expression & exp,
   if(exp->get_type() != T_FUNCTION || exp->get_symbol() != _symbol)
     return false;
 
-  if(_factory->get_signature()->get_syntax_checking() &&
-     !_sort->is_equivalent(exp->get_sort()))
+  if(_sort != exp->get_sort())
     return false;
   
   const expression_vector & exp_ops = exp->get_operands();
@@ -401,7 +399,7 @@ function_expression_node::out(std::ostream & ostr) const
 }
 
 
-expression function_expression_node::eliminate_let_binders(substitution && sub) const
+expression function_expression_node::eliminate_let_binders(const substitution & sub) const
 {
   if(_operands->empty())
     return const_cast<function_expression_node*>(this)->shared_from_this();
@@ -410,7 +408,7 @@ expression function_expression_node::eliminate_let_binders(substitution && sub) 
   for(expression_vector::const_iterator it = _operands->begin(),
 	it_end = _operands->end(); it != it_end; ++it)
     {
-      nolet_operands.push_back((*it)->eliminate_let_binders(std::move(sub)));
+      nolet_operands.push_back((*it)->eliminate_let_binders(sub));
     }
 
   return _factory->create_expression(_symbol, std::move(nolet_operands), _sort);
@@ -461,7 +459,7 @@ unsigned function_expression_node::get_complexity() const
 void quantifier_expression_node::calculate_hash()
 {
   _hash_code = default_hash_combiner()(default_hash_combiner()(_expr->hash_code(),
-							       vector_hash_code<sorted_variable>()(*_vars)),
+							       vector_hash_code<sorted_variable>()(_vars)),
 				       std::hash<std::size_t>()((std::size_t) _quantifier));
 }
 
@@ -472,7 +470,7 @@ quantifier_expression_node(expression_factory * factory,
 			   const expression & expr)
   : quantifier_expression_node(factory,
 			       qn,
-			       !vars.empty() ? std::move(sorted_variable_vector(vars)) : std::move(_dummy_svar_vector),
+			       sorted_variable_vector(vars),
 			       expr)
 {}
 
@@ -483,16 +481,14 @@ quantifier_expression_node(expression_factory * factory,
 			   const expression & expr)
   :expression_node(factory),
    _quantifier(qn),
-   _vars(!vars.empty() ? new sorted_variable_vector(std::move(vars)) : &EMPTY_SORTED_VARIABLE_VECTOR),
+   _vars(std::move(vars)),
    _expr(expr),
    _all_vars(0),
    _free_vars(0)
 {
   if(_factory->get_signature()->get_syntax_checking())
     {
-      if(!_expr->get_sort()->
-	 is_equivalent(_factory->get_signature()->
-		       get_sort_factory()->BOOL_SORT()))
+      if(_expr->get_sort() != _factory->get_signature()->get_sort_factory()->BOOL_SORT())
 	throw quantified_non_boolean_exception("Expression (quantifier) cannot be instantiated", _expr);
     }
   calculate_hash();
@@ -503,7 +499,7 @@ quantifier_expression_node::
 quantifier_expression_node(expression_factory * factory)
   :expression_node(factory),
    _quantifier(Q_UNDEFINED),
-   _vars(0),
+   _vars(),
    _expr(),
    _all_vars(0),
    _free_vars(0)
@@ -515,7 +511,7 @@ quantifier_expression_node::get_variables()
   if(_all_vars == 0)
     {
       sorted_variable_set * temp = new sorted_variable_set(_expr->get_variables()); 
-      temp->insert(_vars->begin(), _vars->end());
+      temp->insert(_vars.begin(), _vars.end());
 
       return *(_all_vars = temp);
     }
@@ -537,9 +533,9 @@ quantifier_expression_node::get_free_variables()
 	    it_end = vars.end(); it != it_end; ++it)
 	{
 	  sorted_variable_vector::const_iterator jt = 
-	    std::find(_vars->begin(), _vars->end(), *it);
+	    std::find(_vars.begin(), _vars.end(), *it);
 
-	  if(jt == _vars->end())
+	  if(jt == _vars.end())
 	    {
 	      if(temp == 0)
 		temp = new sorted_variable_set(HASH_TABLE_SIZE);
@@ -562,8 +558,8 @@ bool
 quantifier_expression_node::check_expression(const signature * sg,
 					     search_mode smode) const
 {
-  for(sorted_variable_vector::const_iterator it = _vars->begin(),
-	it_end = _vars->end(); it != it_end; ++it)
+  for(sorted_variable_vector::const_iterator it = _vars.begin(),
+	it_end = _vars.end(); it != it_end; ++it)
     {
       if(!it->get_sort()->check_sort(sg, smode) || 
 	 it->get_sort()->has_parameters())
@@ -579,8 +575,8 @@ void
 quantifier_expression_node::out(std::ostream & ostr) const
 {
   sorted_variable_vector::const_iterator 
-    it = _vars->begin(), 
-    it_end = _vars->end();
+    it = _vars.begin(), 
+    it_end = _vars.end();
 
   ostr << (_quantifier == Q_FORALL ? "(forall (" : "(exists (") << *it++;
   
@@ -591,19 +587,27 @@ quantifier_expression_node::out(std::ostream & ostr) const
   ostr << ")";
 } 
 
-template <typename container_type>
-bool contains_variable(container_type & container, const variable & v)
+bool contains_variable(const sorted_variable_vector & vec, const sorted_variable & v)
 {
-  typename container_type::const_iterator it = container.begin(),
-    it_end = container.end();
-  
-  for(; it != it_end; ++it)
-    {
-      if(it->get_variable() == v)
-	return true;
-    }
-  return false;
+  return std::find(vec.begin(), vec.end(), v) != vec.end();  
 }
+
+bool contains_variable(const variable_binding_vector & vec, const sorted_variable & v)
+{
+  return std::find_if(vec.begin(), vec.end(), [&v] (const variable_binding & vb) -> bool
+  {
+    return vb.get_variable() == v.get_variable() &&
+      vb.get_expression()->get_sort() == v.get_sort();
+    
+  }) != vec.end();  
+}
+
+
+bool contains_variable(const sorted_variable_set & s, const sorted_variable & v)
+{
+  return s.find(v) != s.end();
+}
+
 
 sorted_variable get_unique_variable(const expression_vector & expv, 
 				    const sort & sr)
@@ -618,7 +622,7 @@ sorted_variable get_unique_variable(const expression_vector & expv,
       expression_vector::const_iterator it = expv.begin(), it_end = expv.end();
       for(; it != it_end; ++it)
 	{
-	  if(contains_variable((*it)->get_variables(), v.get_variable()))
+	  if(contains_variable((*it)->get_variables(), v))
 	    break;
 	}
       
@@ -637,7 +641,7 @@ get_instance(const substitution & sb) const
   for(substitution::const_iterator it = sb.begin(),
 	it_end = sb.end(); it != it_end; ++it)
     {
-      if(!contains_variable(*_vars, it->first))
+      if(!contains_variable(_vars, sorted_variable(it->first, it->second->get_sort())))
 	{
 	  s.insert(*it);
 	}
@@ -654,14 +658,14 @@ get_instance(const substitution & sb) const
 	sit_end = s.end(); sit != sit_end; ++sit)
     expv.push_back(sit->second);
   
-  for(sorted_variable_vector::const_iterator it = _vars->begin(), 
-	it_end = _vars->end(); it != it_end; ++it)
+  for(sorted_variable_vector::const_iterator it = _vars.begin(), 
+	it_end = _vars.end(); it != it_end; ++it)
     {
       substitution::const_iterator jt = s.begin(), jt_end = s.end();
       for(;jt != jt_end; ++jt)
 	{
 	  const sorted_variable_set & fvars = jt->second->get_free_variables();
-	  if(contains_variable(fvars, it->get_variable()))
+	  if(contains_variable(fvars, *it))
 	    break;
 	}
       
@@ -671,7 +675,7 @@ get_instance(const substitution & sb) const
 	  expression v_exp = _factory->create_expression(v.get_variable(),
 							 v.get_sort());
 
-	  vsub.insert(std::make_pair(it->get_variable(), v_exp));
+	  vsub[it->get_variable()] = v_exp;
 	  sub_vars.push_back(v);
 	}
       else
@@ -681,7 +685,7 @@ get_instance(const substitution & sb) const
     }
 
   if(vsub.empty())
-    return _factory->create_expression(_quantifier, *_vars, 
+    return _factory->create_expression(_quantifier, _vars, 
 				       _expr->get_instance(s));
   else
     return _factory->create_expression(_quantifier, std::move(sub_vars), 
@@ -701,20 +705,14 @@ bool quantifier_expression_node::is_instance(const expression & exp,
 
   const sorted_variable_vector & exp_vars = exp->get_quantified_variables();
 
-  if(_vars->size() != exp_vars.size())
+  if(_vars != exp_vars)
     return false;
 
   substitution temp_sub;
-  bool retval = true;
-
-  for(sorted_variable_vector::const_iterator it = _vars->begin(), 
-	it_end = _vars->end(), nit = exp_vars.begin();
-      it != it_end; ++it, ++nit)
+  for(sorted_variable_vector::const_iterator it = _vars.begin(), 
+	it_end = _vars.end();
+      it != it_end; ++it)
     {
-      if(_factory->get_signature()->get_syntax_checking() && 
-	 !it->get_sort()->is_equivalent(nit->get_sort()))
-	retval = false;
-
       substitution::const_iterator sit = sb.find(it->get_variable());
       if(sit != sb.end())
 	{
@@ -723,15 +721,15 @@ bool quantifier_expression_node::is_instance(const expression & exp,
 	}
       sb.insert(std::make_pair(it->get_variable(), 
 			       _factory->
-			       create_expression(nit->get_variable(),
-						 nit->get_sort())));
+			       create_expression(it->get_variable(),
+						 it->get_sort())));
     }
   
-  retval = retval && _expr->is_instance(exp->get_subexpression(), sb);
+  bool retval = _expr->is_instance(exp->get_subexpression(), sb);
   
-  for(sorted_variable_vector::const_iterator it = _vars->begin(), 
-	it_end = _vars->end(), nit = exp_vars.begin();
-      it != it_end; ++it, ++nit)
+  for(sorted_variable_vector::const_iterator it = _vars.begin(), 
+	it_end = _vars.end();
+      it != it_end; ++it)
     {
       sb.erase(it->get_variable());
     }
@@ -745,6 +743,65 @@ bool quantifier_expression_node::is_instance(const expression & exp,
   return retval;
 }
 
+expression quantifier_expression_node::eliminate_let_binders(const substitution & sub) const
+{
+  substitution s;
+  for(substitution::const_iterator it = sub.begin(),
+	it_end = sub.end(); it != it_end; ++it)
+    {
+      if(!contains_variable(_vars, sorted_variable(it->first, it->second->get_sort())))
+	{
+	  s.insert(*it);
+	}
+    }
+ 
+  if(s.empty())
+    {
+      return _factory->create_expression(_quantifier, _vars, _expr->eliminate_let_binders(s));
+    }
+  
+  substitution vsub;
+  sorted_variable_vector sub_vars;
+  expression_vector expv;
+  expv.push_back(const_cast<quantifier_expression_node*>(this)->shared_from_this());
+  for(substitution::const_iterator sit = s.begin(), 
+	sit_end = s.end(); sit != sit_end; ++sit)
+    expv.push_back(sit->second);
+  
+  for(sorted_variable_vector::const_iterator it = _vars.begin(), 
+	it_end = _vars.end(); it != it_end; ++it)
+    {
+      substitution::const_iterator jt = s.begin(), jt_end = s.end();
+      for(;jt != jt_end; ++jt)
+	{
+	  const sorted_variable_set & fvars = jt->second->get_free_variables();
+	  if(contains_variable(fvars, *it))
+	    break;
+	}
+      
+      if(jt != jt_end)
+	{
+	  sorted_variable v = get_unique_variable(expv, it->get_sort());
+	  expression v_exp = _factory->create_expression(v.get_variable(),
+							 v.get_sort());
+
+	  vsub[it->get_variable()] = v_exp;
+	  sub_vars.push_back(v);
+	}
+      else
+	{
+	  sub_vars.push_back(*it);
+	}
+    }
+
+  if(vsub.empty())
+    return _factory->create_expression(_quantifier, _vars, 
+				       _expr->eliminate_let_binders(s));
+  else
+    return _factory->create_expression(_quantifier, std::move(sub_vars), 
+				       _expr->get_instance(vsub)->eliminate_let_binders(s)); 
+}
+
 expression quantifier_expression_node::infer_sorts() const
 {
   if(_factory->get_signature()->get_syntax_checking())
@@ -752,18 +809,17 @@ expression quantifier_expression_node::infer_sorts() const
 
   expression infered_expr = _expr->infer_sorts();
 
-  if(!infered_expr->get_sort()->
-     is_equivalent(_factory->get_signature()->get_sort_factory()->BOOL_SORT()))
+  if(infered_expr->get_sort() != _factory->get_signature()->get_sort_factory()->BOOL_SORT())
     throw quantified_non_boolean_exception("Cannot infer expression (quantifier) sort", infered_expr);
-  for(sorted_variable_vector::const_iterator it = _vars->begin(),
-	it_end = _vars->end(); it != it_end; ++it)
+  for(sorted_variable_vector::const_iterator it = _vars.begin(),
+	it_end = _vars.end(); it != it_end; ++it)
     if(it->get_sort() == _factory->get_signature()->
        get_sort_factory()->UNDEFINED_SORT() ||
        it->get_sort()->has_parameters())
       throw bad_sort_exception("Cannot infer expression (quantifier) sort", 
 			       it->get_sort());
    
-  return _factory->create_expression(_quantifier, *_vars, infered_expr);
+  return _factory->create_expression(_quantifier, _vars, infered_expr);
 }
 
   
@@ -773,8 +829,8 @@ expand_expression(const signature * sg,
 { 
   sorted_variable_vector exp_vars;
     
-  for(sorted_variable_vector::const_iterator it = _vars->begin(),
-	it_end = _vars->end(); it != it_end; ++it)
+  for(sorted_variable_vector::const_iterator it = _vars.begin(),
+	it_end = _vars.end(); it != it_end; ++it)
     {
       exp_vars.push_back(sorted_variable(it->get_variable(),
 					 it->get_sort()->expand_sort(sg,
@@ -784,8 +840,7 @@ expand_expression(const signature * sg,
 
   expression expanded_expr = _expr->expand_expression(sg, smode);
 
-  if(!expanded_expr->get_sort()->
-     is_equivalent(_factory->get_signature()->get_sort_factory()->BOOL_SORT()))
+  if(expanded_expr->get_sort() != _factory->get_signature()->get_sort_factory()->BOOL_SORT())
     throw quantified_non_boolean_exception("Cannot expand expression (quantifier)", expanded_expr);
     
 
@@ -804,14 +859,14 @@ quantifier_expression_node::accept_visitor(expression_visitor & visitor)
 expression quantifier_expression_node::clone_expression(expression_factory * other_factory) const
 {
   expression os = _expr->clone_expression(other_factory);
-  return other_factory->create_expression(_quantifier, *_vars, os);
+  return other_factory->create_expression(_quantifier, _vars, os);
 }
 
 
 void let_expression_node::calculate_hash()
 {
   _hash_code = default_hash_combiner()(_expr->hash_code(),
-				       vector_hash_code<variable_binding>()(*_bind)); 
+				       vector_hash_code<variable_binding>()(_bind)); 
 }
 
 let_expression_node::
@@ -819,7 +874,7 @@ let_expression_node(expression_factory * factory,
 		    const variable_binding_vector & bind, 
 		    const expression & expr)
   : let_expression_node(factory,
-			!bind.empty() ? std::move(variable_binding_vector(bind)) : std::move(_dummy_vb_vector),
+			variable_binding_vector(bind),
 			expr)
 {}
 
@@ -828,7 +883,7 @@ let_expression_node(expression_factory * factory,
 		    variable_binding_vector && bind, 
 		    const expression & expr)
   :expression_node(factory),
-   _bind(!bind.empty() ? new variable_binding_vector(std::move(bind)) : &EMPTY_VARIABLE_BINDING_VECTOR),
+   _bind(std::move(bind)),
    _expr(expr),
    _all_vars(0),
    _free_vars(0)
@@ -845,7 +900,7 @@ let_expression_node(expression_factory * factory,
 let_expression_node::
 let_expression_node(expression_factory * factory)
   :expression_node(factory),
-   _bind(0),
+   _bind(),
    _expr(),
    _all_vars(0),
    _free_vars(0)
@@ -860,11 +915,11 @@ let_expression_node::get_variables()
     {
       sorted_variable_set * temp = new sorted_variable_set(_expr->get_variables()); 
 
-      for(variable_binding_vector::const_iterator it = _bind->begin(), 
-	    it_end = _bind->end(); it != it_end; ++it)
+      for(variable_binding_vector::const_iterator it = _bind.begin(), 
+	    it_end = _bind.end(); it != it_end; ++it)
 	{
 	  temp->insert(sorted_variable(it->get_variable(), 
-				       it->get_expression()->get_sort()));
+				       it->get_expression()->get_inferred_sort()));
 	  
 	  const sorted_variable_set & vars = it->get_expression()->get_variables();
 	  temp->insert(vars.begin(), vars.end());
@@ -885,18 +940,19 @@ let_expression_node::get_free_variables()
       const sorted_variable_set & vars = _expr->get_free_variables();
 
       sorted_variable_set * temp = 0;
-
+      sorted_variable_set bound_vars(HASH_TABLE_SIZE);
+      
       for(sorted_variable_set::const_iterator it = vars.begin(), 
 	    it_end = vars.end(); it != it_end; ++it)
 	{
 	  variable_binding_vector::const_iterator 
-	    jt = _bind->begin(),
-	    jt_end = _bind->end();
+	    jt = _bind.begin(),
+	    jt_end = _bind.end();
 
 	  for(; jt != jt_end; ++jt)
 	    {
 	      if(jt->get_variable() == it->get_variable() &&
-		 jt->get_expression()->get_sort() == it->get_sort())
+		 jt->get_expression()->get_inferred_sort() == it->get_sort())
 		break;
 	    }
 
@@ -906,21 +962,30 @@ let_expression_node::get_free_variables()
 		temp = new sorted_variable_set(HASH_TABLE_SIZE);
 
 	      temp->insert(*it);
-	    }	  
+	    }
+	  else
+	    bound_vars.insert(*it);
 	}
 
       for(variable_binding_vector::const_iterator 
-	    jt = _bind->begin(),
-	    jt_end = _bind->end(); jt != jt_end; ++jt)
+	    jt = _bind.begin(),
+	    jt_end = _bind.end(); jt != jt_end; ++jt)
 	{
+	  if(bound_vars.find(sorted_variable(jt->get_variable(),
+					     jt->get_expression()->
+					     get_inferred_sort())) == bound_vars.end())
+	    {
+	      continue;
+	    }
+	  
 	  const sorted_variable_set & vars = 
 	    jt->get_expression()->get_free_variables();
 	  
-	  if(!vars.empty())
+	  if(!vars.empty()) 
 	    {
 	      if(temp == 0)
 		temp = new sorted_variable_set(HASH_TABLE_SIZE);
-
+	      
 	      temp->insert(vars.begin(), vars.end());
 	    }
 	}
@@ -939,8 +1004,8 @@ bool
 let_expression_node::check_expression(const signature * sg,
 				      search_mode smode) const
 {
-  for(variable_binding_vector::const_iterator it = _bind->begin(),
-	it_end = _bind->end();
+  for(variable_binding_vector::const_iterator it = _bind.begin(),
+	it_end = _bind.end();
       it != it_end;
       ++it)
     {
@@ -959,8 +1024,8 @@ expression let_expression_node::infer_sorts() const
   expression infered_expr = _expr->infer_sorts();
   variable_binding_vector infered_bind;
 
-  for(variable_binding_vector::const_iterator it = _bind->begin(),
-	it_end = _bind->end(); it != it_end; ++it)
+  for(variable_binding_vector::const_iterator it = _bind.begin(),
+	it_end = _bind.end(); it != it_end; ++it)
     {
       infered_bind.push_back(variable_binding(it->get_variable(), 
 					      it->get_expression()->
@@ -974,66 +1039,78 @@ expression let_expression_node::infer_sorts() const
 expression let_expression_node::
 get_instance(const substitution & sb) const
 {
-
-  /* Instead the expression (let x1 -> t1, ..., xn -> tn) F, we consider
-     the expression: (forall x1:s1,...,xn:sn) (x = F /\ x1 = t1 /\ ... /\
-     xn = tn). After we apply the supstitution to the latter formula, 
-     we just take the parts that we need to form the resulting let 
-     expression */
-
-  expression_vector conjs;
-  sorted_variable_vector vars;
-  for(variable_binding_vector::const_iterator it = _bind->begin(),
-	it_end = _bind->end();
-      it != it_end;
-      ++it)
+  substitution s;
+  for(substitution::const_iterator it = sb.begin(),
+	it_end = sb.end(); it != it_end; ++it)
     {
-      
-      expression t_exp = it->get_expression();
-      
-      vars.push_back(sorted_variable(it->get_variable(), t_exp->get_sort()));
-      
-      expression x_exp = _factory->create_expression(it->get_variable(),
-						     t_exp->get_sort());
-      
-      conjs.push_back(_factory->create_expression(function_symbol::EQ,
-						  x_exp, t_exp));
+      if(!contains_variable(_bind, sorted_variable(it->first, it->second->get_sort())))
+	{
+	  s.insert(*it);
+	}
     }
 
-  conjs.push_back(_expr);
-  
 
-  sorted_variable sv = get_unique_variable(conjs, _expr->get_sort());
-
-  expression sv_exp = _factory->create_expression(sv.get_variable(),
-						  sv.get_sort());
-
-  conjs.pop_back();
-  conjs.push_back(_factory->
-		  create_expression(function_symbol::EQ, sv_exp, _expr));
-					     
-  
-  expression conj_exp = _factory->create_expression(function_symbol::AND,
-						    std::move(conjs));
-
-  expression q_exp = _factory->create_expression(Q_FORALL, std::move(vars), conj_exp);
-  
-  expression q_exp_sub = q_exp->get_instance(sb);
-  
-  const expression_vector & sub_ops = 
-    q_exp_sub->get_subexpression()->get_operands(); 
-
-  expression sub_expr = sub_ops.back()->get_operands()[1];
-  variable_binding_vector bind_sub;
-  for(expression_vector::const_iterator it = sub_ops.begin(),
-	it_end = sub_ops.end(); it + 1 != it_end; ++it)
+  if(s.empty())
     {
-      bind_sub.push_back(variable_binding((*it)->get_operands()[0]->
-					  get_variable(), 
-					  (*it)->get_operands()[1]));
+      variable_binding_vector sub_bind;
+      for(variable_binding_vector::const_iterator it = _bind.begin(),
+	    it_end = _bind.end();
+	  it != it_end;
+	  ++it)
+	{
+	  sub_bind.push_back(variable_binding(it->get_variable(),
+					      it->get_expression()->get_instance(sb)));
+	}
+
+      return _factory->create_expression(std::move(sub_bind), _expr);
     }
+
+
+  substitution vsub;
+  variable_binding_vector sub_bind;
+  expression_vector expv;
+  expv.push_back(const_cast<let_expression_node*>(this)->shared_from_this());
+  for(substitution::const_iterator sit = s.begin(), 
+	sit_end = s.end(); sit != sit_end; ++sit)
+    expv.push_back(sit->second);
   
-  return _factory->create_expression(std::move(bind_sub), sub_expr);
+  for(variable_binding_vector::const_iterator it = _bind.begin(), 
+	it_end = _bind.end(); it != it_end; ++it)
+    {
+      sort it_sort = it->get_expression()->get_sort();
+      
+      substitution::const_iterator jt = s.begin(), jt_end = s.end();
+      for(;jt != jt_end; ++jt)
+	{
+	  const sorted_variable_set & fvars = jt->second->get_free_variables();
+	  if(contains_variable(fvars, sorted_variable(it->get_variable(), it_sort)))
+	    {
+	      break;
+	    }
+	}
+      
+      if(jt != jt_end)
+	{
+	  sorted_variable v = get_unique_variable(expv, it_sort);
+	  expression v_exp = _factory->create_expression(v.get_variable(),
+							 v.get_sort());
+
+	  vsub[it->get_variable()] = v_exp;
+	  sub_bind.push_back(variable_binding(v.get_variable(), it->get_expression()->get_instance(sb)));
+	}
+      else
+	{
+	  sub_bind.push_back(variable_binding(it->get_variable(), it->get_expression()->get_instance(sb)));
+	}
+    }
+
+  if(vsub.empty())
+    return _factory->create_expression(std::move(sub_bind), _expr->get_instance(s));
+  else
+    return _factory->create_expression(std::move(sub_bind), 
+				       _expr->get_instance(vsub)->
+				       get_instance(s)); 
+
 }
 
 
@@ -1045,15 +1122,18 @@ bool let_expression_node::is_instance(const expression & exp,
 
   const variable_binding_vector & exp_bind = exp->get_variable_bindings();
   
-  if(_bind->size() != exp_bind.size())
+  if(_bind.size() != exp_bind.size())
     return false;
  
   sorted_variable_vector vars, exp_vars;
 
-  for(variable_binding_vector::const_iterator it = _bind->begin(), 
-	it_end = _bind->end(), nit = exp_bind.begin(); 
+  for(variable_binding_vector::const_iterator it = _bind.begin(), 
+	it_end = _bind.end(), nit = exp_bind.begin(); 
       it != it_end; ++it, ++nit)
     {
+      if(it->get_variable() != nit->get_variable())
+	return false;
+      
       if(!it->get_expression()->is_instance(nit->get_expression(), sb))
 	return false;
 
@@ -1075,8 +1155,8 @@ expand_expression(const signature * sg,
 		  search_mode smode) const
 {  
   variable_binding_vector expanded_bind;
-  for(variable_binding_vector::const_iterator it = _bind->begin(),
-	it_end = _bind->end(); it != it_end; ++it)
+  for(variable_binding_vector::const_iterator it = _bind.begin(),
+	it_end = _bind.end(); it != it_end; ++it)
     {
       expanded_bind.push_back(variable_binding(it->get_variable(),
 					       it->get_expression()->
@@ -1094,8 +1174,8 @@ void
 let_expression_node::out(std::ostream & ostr) const
 {
   variable_binding_vector::const_iterator 
-    it = _bind->begin(),
-    it_end = _bind->end();
+    it = _bind.begin(),
+    it_end = _bind.end();
   
   ostr << "(let (" << *it++;
   for(;it != it_end; ++it)
@@ -1106,26 +1186,28 @@ let_expression_node::out(std::ostream & ostr) const
 } 
 
 
-expression let_expression_node::eliminate_let_binders(substitution && sub) const
+expression let_expression_node::eliminate_let_binders(const substitution & sub) const
 {
-  std::unordered_set<variable> var_set;
-  for(variable_binding_vector::const_iterator it = _bind->begin(), 
-	it_end = _bind->end(); it != it_end; ++it)
+  substitution s;
+  
+  for(variable_binding_vector::const_iterator it = _bind.begin(),
+	it_end = _bind.end();
+      it != it_end;
+      ++it)
     {
-      expression nolet_it = it->get_expression()->eliminate_let_binders(std::move(sub));
-      sub.insert(std::make_pair(it->get_variable(), nolet_it));
-      var_set.insert(it->get_variable());
+      s.insert(std::make_pair(it->get_variable(), it->get_expression()->eliminate_let_binders(sub)));
     }
 
-  expression nolet_expr = _expr->eliminate_let_binders(std::move(sub));
-    
-  for(std::unordered_set<variable>::const_iterator it = var_set.begin(), 
-	it_end = var_set.end(); it != it_end; ++it)
+  for(substitution::const_iterator it = sub.begin(),
+	it_end = sub.end(); it != it_end; ++it)
     {
-      sub.erase(*it);
+      if(!contains_variable(_bind, sorted_variable(it->first, it->second->get_sort())))
+	{
+	  s.insert(*it);
+	}
     }
-	
-  return nolet_expr;
+
+  return _expr->eliminate_let_binders(s);  
 }
 
 void 
@@ -1133,8 +1215,8 @@ let_expression_node::accept_visitor(expression_visitor & visitor)
 {
   visitor.visit_let_expression_node_preorder(this->shared_from_this());
     
-  for(variable_binding_vector::const_iterator it = _bind->begin(),
-	it_end = _bind->end(); it != it_end; ++it)
+  for(variable_binding_vector::const_iterator it = _bind.begin(),
+	it_end = _bind.end(); it != it_end; ++it)
     it->get_expression()->accept_visitor(visitor);
 
   visitor.visit_let_expression_node_inorder(this->shared_from_this());
@@ -1148,19 +1230,14 @@ expression let_expression_node::clone_expression(expression_factory * other_fact
 {
   expression os = _expr->clone_expression(other_factory);
 
-  if(!_bind->empty())
+  variable_binding_vector ovb;
+  ovb.reserve(_bind.size());
+  for(unsigned i = 0; i < _bind.size(); i++)
     {
-      variable_binding_vector ovb;
-      ovb.reserve(_bind->size());
-      for(unsigned i = 0; i < _bind->size(); i++)
-	{
-	  ovb.push_back(variable_binding((*_bind)[i].get_variable(),
-					 (*_bind)[i].get_expression()->clone_expression(other_factory)));
-	}
-      return other_factory->create_expression(std::move(ovb), os);
+      ovb.push_back(variable_binding(_bind[i].get_variable(),
+				     _bind[i].get_expression()->clone_expression(other_factory)));
     }
-  else
-    return other_factory->create_expression(EMPTY_VARIABLE_BINDING_VECTOR, os);
+  return other_factory->create_expression(std::move(ovb), os);
 }
   
 
@@ -1168,8 +1245,8 @@ unsigned let_expression_node::get_complexity() const
 {
   unsigned cpl = 1 + _expr->get_complexity();
     
-  for(variable_binding_vector::const_iterator it = _bind->begin(),
-	it_end = _bind->end(); it != it_end; ++it)
+  for(variable_binding_vector::const_iterator it = _bind.begin(),
+	it_end = _bind.end(); it != it_end; ++it)
     cpl += 1 + it->get_expression()->get_complexity();
     
   return cpl;
@@ -1189,8 +1266,6 @@ expression_factory::~expression_factory()
 {
   _destruction = true;
   _fun_node._operands = &EMPTY_EXPRESSION_VECTOR;
-  _quant_node._vars = &EMPTY_SORTED_VARIABLE_VECTOR;
-  _let_node._bind = &EMPTY_VARIABLE_BINDING_VECTOR;
   for(std::unordered_set<expression_node *>::iterator it = 
 	_expressions.begin(),
 	it_end = _expressions.end(); it != it_end;

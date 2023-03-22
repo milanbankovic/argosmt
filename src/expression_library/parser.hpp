@@ -1,8 +1,8 @@
-/* A Bison parser, made by GNU Bison 3.5.3.  */
+/* A Bison parser, made by GNU Bison 3.8.2.  */
 
 /* Bison interface for Yacc-like parsers in C
 
-   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2020 Free Software Foundation,
+   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
    Inc.
 
    This program is free software: you can redistribute it and/or modify
@@ -16,7 +16,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* As a special exception, you may create a larger work that contains
    part or all of the Bison parser skeleton and distribute that work
@@ -31,8 +31,9 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
-/* Undocumented macros, especially those whose name start with YY_,
-   are private implementation details.  Do not rely on them.  */
+/* DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+   especially those whose name start with YY_ or yy_.  They are
+   private implementation details that can be changed or removed.  */
 
 #ifndef YY_YY_PARSER_HPP_INCLUDED
 # define YY_YY_PARSER_HPP_INCLUDED
@@ -44,57 +45,66 @@
 extern int yydebug;
 #endif
 
-/* Token type.  */
+/* Token kinds.  */
 #ifndef YYTOKENTYPE
 # define YYTOKENTYPE
   enum yytokentype
   {
-    NUMERAL = 258,
-    DECIMAL = 259,
-    HEXADECIMAL = 260,
-    BINARY = 261,
-    STRING_LITERAL = 262,
-    RW_PAR = 263,
-    RW_NUMERAL = 264,
-    RW_DECIMAL = 265,
-    RW_STRING = 266,
-    RW_UNDERSCORE = 267,
-    RW_EXCLAMATION = 268,
-    RW_AS = 269,
-    RW_LET = 270,
-    RW_FORALL = 271,
-    RW_EXISTS = 272,
-    RW_SET_LOGIC = 273,
-    RW_SET_OPTION = 274,
-    RW_SET_INFO = 275,
-    RW_DECLARE_SORT = 276,
-    RW_DEFINE_SORT = 277,
-    RW_EXPAND_SORT = 278,
-    RW_DECLARE_CONST = 279,
-    RW_DECLARE_FUN = 280,
-    RW_DEFINE_FUN = 281,
-    RW_EXPAND_TERM = 282,
-    RW_PUSH = 283,
-    RW_POP = 284,
-    RW_ASSERT = 285,
-    RW_CHECK_SAT = 286,
-    RW_GET_SORT = 287,
-    RW_GET_ASSERTIONS = 288,
-    RW_GET_PROOF = 289,
-    RW_GET_UNSAT_CORE = 290,
-    RW_GET_VALUE = 291,
-    RW_GET_ASSIGNMENT = 292,
-    RW_GET_OPTION = 293,
-    RW_GET_INFO = 294,
-    RW_RESET_ASSERTIONS = 295,
-    RW_RESET = 296,
-    RW_ECHO = 297,
-    RW_EXIT = 298,
-    SYMBOL = 299,
-    KEYWORD = 300
+    YYEMPTY = -2,
+    YYEOF = 0,                     /* "end of file"  */
+    YYerror = 256,                 /* error  */
+    YYUNDEF = 257,                 /* "invalid token"  */
+    NUMERAL = 258,                 /* NUMERAL  */
+    DECIMAL = 259,                 /* DECIMAL  */
+    HEXADECIMAL = 260,             /* HEXADECIMAL  */
+    BINARY = 261,                  /* BINARY  */
+    STRING_LITERAL = 262,          /* STRING_LITERAL  */
+    RW_PAR = 263,                  /* RW_PAR  */
+    RW_NUMERAL = 264,              /* RW_NUMERAL  */
+    RW_DECIMAL = 265,              /* RW_DECIMAL  */
+    RW_STRING = 266,               /* RW_STRING  */
+    RW_UNDERSCORE = 267,           /* RW_UNDERSCORE  */
+    RW_EXCLAMATION = 268,          /* RW_EXCLAMATION  */
+    RW_AS = 269,                   /* RW_AS  */
+    RW_LET = 270,                  /* RW_LET  */
+    RW_FORALL = 271,               /* RW_FORALL  */
+    RW_EXISTS = 272,               /* RW_EXISTS  */
+    RW_SET_LOGIC = 273,            /* RW_SET_LOGIC  */
+    RW_SET_OPTION = 274,           /* RW_SET_OPTION  */
+    RW_SET_INFO = 275,             /* RW_SET_INFO  */
+    RW_DECLARE_SORT = 276,         /* RW_DECLARE_SORT  */
+    RW_DEFINE_SORT = 277,          /* RW_DEFINE_SORT  */
+    RW_EXPAND_SORT = 278,          /* RW_EXPAND_SORT  */
+    RW_DECLARE_CONST = 279,        /* RW_DECLARE_CONST  */
+    RW_DECLARE_FUN = 280,          /* RW_DECLARE_FUN  */
+    RW_DEFINE_FUN = 281,           /* RW_DEFINE_FUN  */
+    RW_EXPAND_TERM = 282,          /* RW_EXPAND_TERM  */
+    RW_PUSH = 283,                 /* RW_PUSH  */
+    RW_POP = 284,                  /* RW_POP  */
+    RW_ASSERT = 285,               /* RW_ASSERT  */
+    RW_CHECK_SAT = 286,            /* RW_CHECK_SAT  */
+    RW_GET_SORT = 287,             /* RW_GET_SORT  */
+    RW_GET_ASSERTIONS = 288,       /* RW_GET_ASSERTIONS  */
+    RW_GET_PROOF = 289,            /* RW_GET_PROOF  */
+    RW_GET_UNSAT_CORE = 290,       /* RW_GET_UNSAT_CORE  */
+    RW_GET_VALUE = 291,            /* RW_GET_VALUE  */
+    RW_GET_ASSIGNMENT = 292,       /* RW_GET_ASSIGNMENT  */
+    RW_GET_OPTION = 293,           /* RW_GET_OPTION  */
+    RW_GET_INFO = 294,             /* RW_GET_INFO  */
+    RW_RESET_ASSERTIONS = 295,     /* RW_RESET_ASSERTIONS  */
+    RW_RESET = 296,                /* RW_RESET  */
+    RW_ECHO = 297,                 /* RW_ECHO  */
+    RW_EXIT = 298,                 /* RW_EXIT  */
+    SYMBOL = 299,                  /* SYMBOL  */
+    KEYWORD = 300                  /* KEYWORD  */
   };
+  typedef enum yytokentype yytoken_kind_t;
 #endif
-/* Tokens.  */
+/* Token kinds.  */
+#define YYEMPTY -2
+#define YYEOF 0
+#define YYerror 256
+#define YYUNDEF 257
 #define NUMERAL 258
 #define DECIMAL 259
 #define HEXADECIMAL 260
@@ -165,7 +175,7 @@ union YYSTYPE
       variable_binding_vector * vb_v_attr;
       expression_vector * term_v_attr;
 
-#line 169 "parser.hpp"
+#line 179 "parser.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -176,6 +186,8 @@ typedef union YYSTYPE YYSTYPE;
 
 extern YYSTYPE yylval;
 
+
 int yyparse (void);
+
 
 #endif /* !YY_YY_PARSER_HPP_INCLUDED  */

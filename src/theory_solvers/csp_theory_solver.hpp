@@ -434,8 +434,8 @@ public:
   {
     return e->get_symbol() == function_symbol::ALLDIFF || 
       e->get_symbol() == function_symbol::NOT_ALLDIFF ||
-      (e->is_constant_function() && e->infer_sorts()->get_sort()->get_symbol() == sort_symbol::REAL) ||
-      (e->is_constant_function() && e->infer_sorts()->get_sort()->get_symbol() == sort_symbol::INT) ||
+      (e->is_constant_function() && e->get_inferred_sort()->get_symbol() == sort_symbol::REAL) ||
+      (e->is_constant_function() && e->get_inferred_sort()->get_symbol() == sort_symbol::INT) ||
       (e->is_numeral_constant() || e->is_decimal_constant() || is_arithmetic(e));
   }  
 

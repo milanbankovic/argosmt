@@ -1081,8 +1081,8 @@ public:
   virtual bool is_owned_expression(const expression & e)
   {
     return e->is_numeral_constant() || e->is_decimal_constant() || is_arithmetic(e)
-      || (e->is_constant_function() && e->infer_sorts()->get_sort()->get_symbol() == sort_symbol::REAL)
-      || (e->is_constant_function() && e->infer_sorts()->get_sort()->get_symbol() == sort_symbol::INT);
+      || (e->is_constant_function() && e->get_inferred_sort()->get_symbol() == sort_symbol::REAL)
+      || (e->is_constant_function() && e->get_inferred_sort()->get_symbol() == sort_symbol::INT);
   }
   
   virtual expression canonize_expression(const expression & e);

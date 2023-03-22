@@ -973,7 +973,7 @@ inline
 bool undefined_sort_node::is_instance(const sort & sr,
 				      instantiation & in) const
 {
-  return ((sort_node *)this) == sr.get();
+  return sr->is_undefined();
 }
 
 inline
@@ -1104,7 +1104,7 @@ bool parameter_sort_node::is_instance(const sort & sr,
   instantiation::const_iterator it = in.find(_parameter);
   
   if(it != in.end())
-    return it->second.get() == sr.get();
+    return it->second == sr;
   else
     {
       in.insert(std::pair<sort_parameter, sort> 
