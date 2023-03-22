@@ -171,8 +171,7 @@ public:
   virtual bool is_owned_expression(const expression & e)
   {
     return e->is_true() || e->is_false() || e->is_sat_literal()
-      || (e->is_constant_function() &&  e->infer_sorts()->get_sort() ==
-	  _solver.get_factory()->get_signature()->get_sort_factory()->BOOL_SORT());
+      || (e->is_constant_function() &&  e->is_formula());
   }
 
   virtual expression canonize_expression(const expression & e);

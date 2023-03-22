@@ -126,7 +126,7 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
       
       _solver->add_theory_solver(new clause_theory_solver(*_solver));
       _solver->add_theory_solver(new euf_theory_solver(*_solver));
-      _solver->add_quantifiers_processor(new e_matching_quantifiers_processor(*_solver));
+      //      _solver->add_quantifiers_processor(new e_matching_quantifiers_processor(*_solver));
       _solver->add_quantifiers_processor(new enumerative_quantifiers_processor(*_solver));
     }
   else if(s == "QF_LRA")

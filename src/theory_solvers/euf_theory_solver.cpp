@@ -29,7 +29,7 @@ bool euf_theory_solver::is_owned_expression(const expression & e)
     }
   if(e->is_constant_function())
     {
-      sort s = e->infer_sorts()->get_sort();
+      sort s = e->get_inferred_sort();
       unsigned s_arity = s->get_operands().size();
       return
 	_solver.get_factory()->get_signature()->
@@ -59,7 +59,7 @@ bool euf_theory_solver::is_owned_expression(const expression & e)
     }
   else if(e->is_special_constant())
     {
-      sort s = e->infer_sorts()->get_sort();
+      sort s = e->get_inferred_sort();
 
       return _solver.get_factory()->
 	get_signature()->check_special_constant(e->get_special_constant(), s, S_CONTEXTUAL) &&
@@ -75,6 +75,7 @@ void euf_theory_solver::new_expression(const expression & e)
 {
   bool relevant = check_term_relevancy(e);
 
+  
   _data.set_data(e, new euf_theory_solver_data(e, relevant, _current_level));
 
   if(!relevant)
@@ -82,6 +83,7 @@ void euf_theory_solver::new_expression(const expression & e)
       //std::cout << "NOT RELEVANT: " << e << std::endl;
       return;
     }
+  //std::cout << "ADDING TERM: " << e << std::endl;
   _terms.push_back(e);
   //std::cout << "Terms: " << _terms.size() << std::endl;
 
@@ -589,6 +591,9 @@ bool euf_theory_solver::check_term_relevancy(const expression & e)
   if(_solver.has_literal_data(e) && _solver.get_literal_data(e)->is_negative())
     return false;
 
+  if(e->is_quantifier())
+    return false;
+  
   common_data * e_data = _solver.get_common_data(e);
   
   if(e->is_constant_function() && e->is_formula() && !e_data->is_shared())

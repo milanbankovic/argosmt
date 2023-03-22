@@ -252,8 +252,7 @@ void arithmetic_theory_solver::init_unknown(const expression & unknown)
   if(_data.has_data(unknown))
     return;
 
-  bool is_integer = (unknown->infer_sorts()->
-		     get_sort()->get_symbol() == sort_symbol::INT);
+  bool is_integer = (unknown->get_inferred_sort()->get_symbol() == sort_symbol::INT);
   if(is_integer && is_atom(unknown))
     {
       _integer_unknowns.push_back(unknown);
