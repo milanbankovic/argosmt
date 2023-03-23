@@ -31,7 +31,7 @@ The simplest way is to use `git` command-line tool:
 To compile the solver (under Linux), you should run the following commands:
 
 	cd argosmt/
-	./configure --enable-hybrid-long-values
+	./configure
 	make	
 
 More configuration options can be inspected with:
