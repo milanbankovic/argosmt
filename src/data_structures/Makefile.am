@@ -11,13 +11,15 @@ noinst_LIBRARIES = libdatastructures.a
 libdatastructures_a_SOURCES =  clause.cpp \
 		 	       conflict_set.cpp \
 	                       explanation.cpp \
-	                       trail.cpp
+	                       trail.cpp \
+		               proofs.cpp
 
 noinst_HEADERS = argosmt_expression_data.hpp \
 	         clause.hpp \
 	         conflict_set.hpp \
 	         explanation.hpp \
 	         trail.hpp \
-	         heap.hpp
+	         heap.hpp \
+                 proofs.hpp
 
 AM_CXXFLAGS += -Wall

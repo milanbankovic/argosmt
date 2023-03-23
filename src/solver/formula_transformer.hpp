@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2021 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2021, 2023 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define _FORMULA_TRANSFORMER_H
 
 #include "clause.hpp"
+#include "proofs.hpp"
 
 /* Simplifies formula and transforms it to CNF form */
 class formula_transformer {
@@ -29,6 +30,7 @@ private:
   signature * _sig;  
   static unsigned long _count;
   std::unordered_map<expression, expression> _names;
+  std::unordered_map<expression, expression> _named_exprs;
   std::unordered_map<sort, expression> _sort_constants;
   
   bool is_chainable(const expression & e)
@@ -71,6 +73,7 @@ public:
   formula_transformer(expression_factory * factory)
     :_exp_factory(factory),
      _names(HASH_TABLE_SIZE),
+     _named_exprs(HASH_TABLE_SIZE),
      _sort_constants(HASH_TABLE_SIZE)
   {
     _sig = _exp_factory->get_signature();
@@ -112,16 +115,8 @@ public:
   void top_level_cnf_transformation(const expression & expr, 
 				    std::vector<clause *> & clauses);
 
-  formula_transformer * clone(expression_factory * factory)
-  {
-    formula_transformer * ft = new formula_transformer(factory);
-    for(auto it = _names.begin(), it_end = _names.end(); it != it_end; ++it)
-      {
-	ft->_names.insert(std::make_pair(it->first->clone_expression(factory),
-					 it->second->clone_expression(factory)));
-      }
-    return ft;
-  }
+  expression expand_names(const expression & expr);
+
 };
 
 #endif // _FORMULA_TRANSFORMER_H

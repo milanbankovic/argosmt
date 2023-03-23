@@ -108,7 +108,8 @@ am__v_AR_1 =
 libdatastructures_a_AR = $(AR) $(ARFLAGS)
 libdatastructures_a_LIBADD =
 am_libdatastructures_a_OBJECTS = clause.$(OBJEXT) \
-	conflict_set.$(OBJEXT) explanation.$(OBJEXT) trail.$(OBJEXT)
+	conflict_set.$(OBJEXT) explanation.$(OBJEXT) trail.$(OBJEXT) \
+	proofs.$(OBJEXT)
 libdatastructures_a_OBJECTS = $(am_libdatastructures_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -127,7 +128,7 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/clause.Po \
 	./$(DEPDIR)/conflict_set.Po ./$(DEPDIR)/explanation.Po \
-	./$(DEPDIR)/trail.Po
+	./$(DEPDIR)/proofs.Po ./$(DEPDIR)/trail.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -275,14 +276,16 @@ noinst_LIBRARIES = libdatastructures.a
 libdatastructures_a_SOURCES = clause.cpp \
 		 	       conflict_set.cpp \
 	                       explanation.cpp \
-	                       trail.cpp
+	                       trail.cpp \
+		               proofs.cpp
 
 noinst_HEADERS = argosmt_expression_data.hpp \
 	         clause.hpp \
 	         conflict_set.hpp \
 	         explanation.hpp \
 	         trail.hpp \
-	         heap.hpp
+	         heap.hpp \
+                 proofs.hpp
 
 all: all-am
 
@@ -335,6 +338,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clause.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/conflict_set.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/explanation.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proofs.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/trail.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
@@ -484,6 +488,7 @@ distclean: distclean-am
 		-rm -f ./$(DEPDIR)/clause.Po
 	-rm -f ./$(DEPDIR)/conflict_set.Po
 	-rm -f ./$(DEPDIR)/explanation.Po
+	-rm -f ./$(DEPDIR)/proofs.Po
 	-rm -f ./$(DEPDIR)/trail.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
@@ -533,6 +538,7 @@ maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/clause.Po
 	-rm -f ./$(DEPDIR)/conflict_set.Po
 	-rm -f ./$(DEPDIR)/explanation.Po
+	-rm -f ./$(DEPDIR)/proofs.Po
 	-rm -f ./$(DEPDIR)/trail.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic

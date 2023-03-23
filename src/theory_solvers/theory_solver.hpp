@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define _THEORY_SOLVER_H
 
 #include "clause.hpp"
+#include "proofs.hpp"
 
 class solver;
 class trail;

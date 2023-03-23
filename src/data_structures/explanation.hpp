@@ -30,31 +30,35 @@ private:
   solver * _sl;
   clause * _cl;
   unsigned _index;
+  proof _proof;
 public:
   explanation()
     :_lits(new expression_vector()),
      _sl(0),
      _cl(0),
-     _index((unsigned)(-1))
+     _index((unsigned)(-1)),
+     _proof(nullptr)
   {}
   
   explanation(solver * sl, clause * cl)
     :_lits(),
      _sl(sl),
      _cl(cl),
-     _index((unsigned)(-1))
+     _index((unsigned)(-1)),
+     _proof(cl->get_proof())
   {}
   
   explanation(solver * sl, clause * cl, unsigned index)
     :_lits(),
      _sl(sl),
      _cl(cl),
-     _index(index)
+     _index(index),
+     _proof(cl->get_proof())
   {}
 
   bool is_clause_explanation() const
   {
-    return _cl != 0;
+    return _cl != nullptr;
   }
   
   clause * get_clause() const
@@ -72,6 +76,26 @@ public:
     return operator[](size() - 1);
   }
 
+  void set_proof(const proof & pr)
+  {
+    _proof = pr;
+  }
+
+  void reset_proof()
+  {
+    _proof.reset();
+  }
+
+  const proof & get_proof() const
+  {
+    return _proof;
+  }
+
+  bool has_proof() const
+  {
+    return _proof.get() != nullptr;
+  }
+  
   void out(std::ostream & ostr) const;
 };
 

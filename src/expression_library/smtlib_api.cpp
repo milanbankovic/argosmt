@@ -651,7 +651,7 @@ define_function(const function_symbol & sm,
 }
 
 
-proof * smtlib_api::get_proof() const
+proof smtlib_api::get_proof() const
 {
   if(!_logic)
     throw logic_not_set_exception("get-proof");
@@ -664,8 +664,12 @@ proof * smtlib_api::get_proof() const
   
   if(_response != CSR_UNSAT)
     throw command_error_exception("get-proof: not unsat");
-  
-  return _solver_interface->get_proof();
+
+  proof pr = _solver_interface->get_proof();
+  if(!pr->check_proof())
+    throw invalid_proof_exception();
+    
+  return pr;
 }
 
 expression_vector smtlib_api::get_unsat_core() const
@@ -864,7 +868,7 @@ void smtlib_api::parse_input(std::istream & istr)
 	  cout() << "(error \"" << e.get_description() << "\")" << std::endl;
 	  if(_error_behavior == EB_IMMEDIATE_EXIT)
 	    {
-	      throw;
+	      exit(1);
 	    }
 	  active_error = true;
 	}

@@ -1704,9 +1704,9 @@ yyreduce:
   case 25: /* command: '(' RW_GET_PROOF ')'  */
 #line 308 "parser.ypp"
         {
-	proof * pr = yy_api->get_proof();
-	pr->print_proof(yy_api->cout());
-	yy_api->cout() << std::endl;
+	  proof pr = yy_api->get_proof();
+	  pr->print_proof(yy_api->cout());
+	  yy_api->cout() << std::endl;
 	}
 #line 1712 "parser.cpp"
     break;

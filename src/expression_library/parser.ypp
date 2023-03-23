@@ -306,9 +306,9 @@ command : '(' RW_SET_LOGIC SYMBOL ')'
 	}
         | '(' RW_GET_PROOF ')'
 	{
-	proof * pr = yy_api->get_proof();
-	pr->print_proof(yy_api->cout());
-	yy_api->cout() << std::endl;
+	  proof pr = yy_api->get_proof();
+	  pr->print_proof(yy_api->cout());
+	  yy_api->cout() << std::endl;
 	}
         | '(' RW_GET_UNSAT_CORE ')'
 	{

@@ -35,6 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "wall_clock.hpp"
 #include "formula_transformer.hpp"
 #include "enumerative_quantifiers_processor.hpp"
+#include "proofs.hpp"
 
 /* Common data assigned to expressions */
 class common_data : public expression_data {
@@ -298,6 +299,8 @@ private:
 
   unsigned _quantifier_instantiation_count_limit;
   unsigned _quantifier_instantiation_term_size_limit;
+
+  clause * _empty_clause;
   
   void cache_equality(const expression & le, const expression & re, const expression & eq)
   { 
@@ -347,7 +350,8 @@ public:
      _dimacs(dimacs),
      _formula_transformer(nullptr),
      _quantifier_instantiation_count_limit((unsigned)(-1)),
-     _quantifier_instantiation_term_size_limit((unsigned)(-1))
+     _quantifier_instantiation_term_size_limit((unsigned)(-1)),
+     _empty_clause(nullptr)
   {
     _literals.reserve(2000);
   }
@@ -630,6 +634,8 @@ public:
 
   void get_model(const expression_vector & exps);
 
+  proof get_proof();
+  
   void print_reports(std::ostream & ostr);
   
   ~solver();

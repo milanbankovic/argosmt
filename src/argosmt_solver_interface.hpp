@@ -87,9 +87,9 @@ public:
 
   virtual expression_vector get_value(const expression_vector & exps);
   
-  virtual proof * get_proof()
+  virtual proof get_proof()
   {
-    throw command_unsupported_exception();
+    return _solver->get_proof();
   }
   
   virtual expression_vector get_unsat_core() 

@@ -93,22 +93,37 @@ class syntax_error_exception : public base_exception {
 public:
   /** Constructor. */
   syntax_error_exception()
-    :base_exception("Syntax error")
+    :base_exception("syntax error")
+  {}
+};
+
+/** Type of exception thrown when the generated proof of
+    unsatisfiability does not pass the validity check */
+class invalid_proof_exception : public base_exception {
+public:
+  /** Constructor */
+  invalid_proof_exception()
+    :base_exception("proof not valid")
   {}
 };
 
 
 /** Represents an abstract proof of unsatisfiability provided by the 
     solver. */
-class proof {
+class proof_node {
 public:
   /** The method should print the proof to the output stream. */
-  virtual void print_proof(std::ostream & ostr) const = 0;
+  virtual void print_proof(std::ostream & ostr) = 0;
 
+  /** This method should return true iff the proof is correct (useful for
+      debugging, the real check should be done by an external tool) */
+  virtual bool check_proof() = 0;
+  
   /** Virtual destructor. */
-  virtual ~proof() {}
+  virtual ~proof_node () {}
 };
 
+using proof = std::shared_ptr<proof_node>;
 
 /** Represents values for error behavior. */
 enum error_behavior 
@@ -273,7 +288,7 @@ public:
   virtual expression_vector get_value(const expression_vector & exps) = 0;
     
   /** Method should return the proof of unsatisfiability. */
-  virtual proof * get_proof() = 0;
+  virtual proof get_proof() = 0;
 
   /** Method should return the vector of expressions from the set of all
       assertions that are the reason for unsatisfiability. According to
@@ -704,7 +719,7 @@ public:
       It invokes get_proof() method of the solver interface. It should be
       called only if :produce-proofs option is set to true (default is false).
       Otherwise, it throws an exception. */
-  proof * get_proof() const;  
+  proof get_proof() const;  
 
   /** Returns the unsat core. It correspomds to get-unsat-core API command.
       It invokes get_unsat_core() method of the solver interface. It should

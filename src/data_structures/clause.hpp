@@ -30,6 +30,7 @@ private:
   bool _is_learnt;
   bool _is_locked;
   unsigned _index;
+  proof _proof;
 public:
   
   typedef expression_vector::iterator iterator;
@@ -39,7 +40,8 @@ public:
     :_activity(0.0),
      _is_learnt(false),
      _is_locked(false),
-     _index(0)
+     _index(0),
+     _proof(nullptr)
   {
     _watches[0] = (unsigned)(-1);
     _watches[1] = (unsigned)(-1);
@@ -215,6 +217,26 @@ public:
     _index = index;
   }
 
+  void set_proof(const proof & pr)
+  {
+    _proof = pr;
+  }
+
+  void reset_proof()
+  {
+    _proof.reset();
+  }
+  
+  const proof & get_proof() const
+  {
+    return _proof;
+  }
+
+  bool has_proof() const
+  {
+    return _proof.get() != nullptr;
+  }
+  
   void print_clause(std::ostream & ostr) const;
 };
 

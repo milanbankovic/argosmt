@@ -680,8 +680,9 @@ void solver::skolemize(const expression & l)
   const sorted_variable_vector & svars = l->get_quantified_variables();  
   substitution sub;
   for(const sorted_variable & svar : svars)
-    sub.insert(std::make_pair(svar.get_variable(), _formula_transformer->get_unique_constant(sk, svar.get_sort())));
-   
+    {      
+      sub.insert(std::make_pair(svar.get_variable(), _formula_transformer->get_unique_constant(sk, svar.get_sort())));
+    }
   expression f = l->get_subexpression()->get_instance(sub);
 
   //  std::cout << "OBTAINED: " << f << std::endl;
@@ -728,13 +729,17 @@ void solver::instantiate(const expression & l, const expression_vector & gterms)
 {
   // forall x1...xn. F(x1,...,xn)
   assert(l->is_quantifier() && l->get_quantifier() == Q_FORALL);
-    
+  
   const sorted_variable_vector & svars = l->get_quantified_variables();
   assert(svars.size() == gterms.size());
   substitution sub;
+  bool simp_needed = false;
   for(unsigned i = 0; i < svars.size(); i++)
-    sub.insert(std::make_pair(svars[i].get_variable(), gterms[i]));
-
+    {
+      if(gterms[i] == _factory->TRUE_EXPRESSION() || gterms[i] == _factory->FALSE_EXPRESSION())
+	simp_needed = true;
+      sub.insert(std::make_pair(svars[i].get_variable(), gterms[i]));
+    }
   expression f = l->get_subexpression()->get_instance(sub);
 
   literal_data * ldata = get_literal_data(l);
@@ -754,10 +759,23 @@ void solver::instantiate(const expression & l, const expression_vector & gterms)
   
   // exists x1...xn. ~F(x1,...,xn) \/ F(t1,...,tn)
 
+  expression f_simp = simp_needed ? _formula_transformer->simplification(f) : f;
+  
+  if(f_simp == _factory->TRUE_EXPRESSION())
+    return;
+
+  if(f_simp == _factory->FALSE_EXPRESSION())
+    {
+      clause * cl = new clause();
+      cl->push_back(get_literal_data(l)->get_opposite());
+      apply_theory_lemma(cl);
+      return;
+    }
+  
   // cnf_transformation of F(t1,...,tn) -> name, def_clauses
   expression name;
   std::vector<clause *> clauses;
-  _formula_transformer->cnf_transformation(f, clauses, name);
+  _formula_transformer->cnf_transformation(f_simp, clauses, name);
   
   // exists x1...xn. ~F(x1,...,xn) \/ name /\ (def_clauses)
   apply_introduce_literal(name);
@@ -831,7 +849,6 @@ check_sat_response solver::solve()
       else
 	{	  
 	  // Resolving literal from current level
-	  //std::cout << "EXPLAINING" << std::endl;
 	  _explain_time_spent.start();
 	  while(!_conflict_set.all_explained())
 	    {
@@ -839,7 +856,6 @@ check_sat_response solver::solve()
 	      _trail.get_source_theory_solver(l)->explain_literal(l);
 	    }
 	  _explain_time_spent.acumulate();
-	  //std::cout << "SUBSUMING" << std::endl;
 	  //Removing subsumed literals
 	  _subsume_time_spent.start();
 	  const expression_vector & conflicting = _conflict_set.get_conflicting();
@@ -862,7 +878,11 @@ check_sat_response solver::solve()
 	      continue;
 	    }
 	  else
-	    break;
+	    {
+	      _empty_clause = _conflict_set.get_clause();
+	      //std::cout << "SIZE: " << _empty_clause->size() << std::endl;
+	      break;
+	    }
 	}
       
       if(_trail.current_level() > 0 && _restart_strategy->should_restart())
@@ -942,6 +962,31 @@ void solver::print_reports(std::ostream & ostr)
   for(unsigned i = 0; i < _theory_solvers.size(); i++)
       _theory_solvers[i]->print_report(ostr);   
 }
+
+
+class dummy_proof : public proof_node {
+public:
+  virtual void print_proof(std::ostream & ostr)
+  {
+    ostr << "(no-proof-available)";
+  }
+  
+  virtual bool check_proof()
+  {
+    return true;
+  }
+
+};
+
+
+proof solver::get_proof()
+{
+  if(_empty_clause->has_proof())
+    return _empty_clause->get_proof();
+  else
+    return std::make_shared<dummy_proof>();
+}
+
 
 solver::~solver()
 {

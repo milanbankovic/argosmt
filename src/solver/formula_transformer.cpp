@@ -1,6 +1,6 @@
 /****************************************************************************
 argosmt (an open source SMT solver)
-Copyright (C) 2021 Milan Bankovic (milan@matf.bg.ac.rs)
+Copyright (C) 2021, 2023 Milan Bankovic (milan@matf.bg.ac.rs)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -351,8 +351,6 @@ void formula_transformer::cnf_transformation(const expression & expr,
   auto it = _names.find(expr);
   if(it != _names.end())
     {
-      //      if(expr != it->second)
-      //std::cout << "Expression " << expr << " already has a name:  " << it->second << std::endl;
       name = it->second;
       return;
     }
@@ -666,7 +664,8 @@ void formula_transformer::cnf_transformation(const expression & expr,
     }
 
   _names.insert(std::make_pair(expr, name));
-  //std::cout << "NAME: " << name << " FOR: " << expr << std::endl;
+  _named_exprs.insert(std::make_pair(name, expr));
+  //  std::cout << "NAME: " << name << " FOR: " << expr << std::endl;
 }
 
 void formula_transformer::top_level_cnf_transformation(const expression & expr, 
@@ -699,3 +698,21 @@ void formula_transformer::top_level_cnf_transformation(const expression & expr,
   clauses.push_back(name_unit);
 }
 
+expression formula_transformer::expand_names(const expression & expr)
+{
+  auto it = _named_exprs.find(expr);
+  if(it != _named_exprs.end())
+    return it->second;
+    
+  if(expr->is_function() && !expr->get_operands().empty())
+    {
+      unsigned n = expr->get_operands().size();
+      expression_vector exp_ops;
+      exp_ops.reserve(n);
+      for(unsigned i = 0; i < n; i++)
+	exp_ops.push_back(expand_names(expr->get_operands()[i]));
+      return _exp_factory->create_expression(expr->get_symbol(), std::move(exp_ops));
+    }
+  else
+    return expr;
+}

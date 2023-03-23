@@ -142,7 +142,8 @@ clause * conflict_set::get_clause() const
 {
   clause * cl = new clause();
   cl->reserve(_conflicting.size());
-  cl->push_back(_solver.get_literal_data(_uip_literal)->get_opposite());
+  if(!_uip_literal->is_undefined())
+    cl->push_back(_solver.get_literal_data(_uip_literal)->get_opposite());
   for(unsigned i = 0; i < _conflicting.size(); i++)
     if(!_data.get_data(_conflicting[i])->_pair_data->_subsumed)
       cl->push_back(_solver.get_literal_data(_conflicting[i])->get_opposite());
