@@ -259,10 +259,10 @@ check_sat_response argosmt_solver_interface::check_sat()
   formula_transformer * ft = new formula_transformer(_smt_lib_api->get_expression_factory());
   
   
-  // Tzeitin transformation, xor elimination, distinct binarization and so on...
+  // CNF transformation
   for(unsigned i = 0; i < assertions.size(); i++)
     {
-      ft->top_level_cnf_transformation(ft->simplification(assertions[i]->expand_expression()->eliminate_let_binders()), clauses);
+      ft->top_level_cnf_transformation(assertions[i]->infer_sorts()->eliminate_let_binders(), clauses);
     }
 
   check_sat_response csr = start_solver(clauses, ft);

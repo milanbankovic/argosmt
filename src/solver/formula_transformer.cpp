@@ -20,317 +20,73 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 unsigned long formula_transformer::_count = 0UL;
 
-expression formula_transformer::simplification(const expression & expr)
+expression formula_transformer::try_expand_def(const expression & e)
 {
-  /* In case of special constants, constant functions and variables */
-  if(expr->is_special_constant() || expr->is_variable() || expr->is_constant_function())
-    return expr;
+  const function_symbol & fs = e->get_symbol();
+  const expression_vector & ops = e->get_operands();
+  sort_vector op_sorts;
+  op_sorts.reserve(ops.size());
+  for(unsigned i = 0; i < ops.size(); i++)
+    op_sorts.push_back(ops[i]->get_sort());
+  sort sr = e->get_sort();
+  function_symbol_checker * checker = _sig->check_function_symbol(fs, op_sorts, sr);
 
-  /* Quantifiers */
-  if(expr->is_quantifier())
+  if(checker == nullptr)
     {
-      expression simp_op = simplification(expr->get_subexpression());
-      const sorted_variable_set & fvars = simp_op->get_free_variables();
-
-      if(fvars.empty())
-	return simp_op;
-      
-      sorted_variable_vector vars;
-      for(auto it = expr->get_quantified_variables().begin(),
-	    it_end = expr->get_quantified_variables().end(); it != it_end; ++it)
-	{
-	  if(fvars.find(*it) != fvars.end())
-	    vars.push_back(*it);
-	}
-      if(vars.empty())
-	return simp_op;
-      else
-	return _exp_factory->create_expression(expr->get_quantifier(), std::move(vars), simp_op);					     
+      return e;
     }
-
-  /* Otherwise, it is a (non-constant) function */
   
-  /* Binarization of chainables */
-  if(is_chainable(expr) && expr->get_operands().size() > 2)
-    {
-      const function_symbol & fs = expr->get_symbol();
-      expression_vector ops;
-      for(expression_vector::const_iterator it = expr->get_operands().begin(),
-	    it_end = expr->get_operands().end() - 1; it != it_end; ++it)
-	{
-	  ops.push_back(_exp_factory->create_expression(fs, *it, *(it + 1)));
-	}
-      return  simplification(_exp_factory->create_expression(function_symbol::AND, std::move(ops)));	
-    }
+  const attribute_set & attr = checker->get_attributes(fs, op_sorts, sr);
 
-  /* Binarization of pairwise */
-  if(is_pairwise(expr) && expr->get_operands().size() > 2)
-    {
-      const function_symbol & fs = expr->get_symbol();
-      expression_vector ops;
-      for(expression_vector::const_iterator it = expr->get_operands().begin(),
-	    it_end = expr->get_operands().end() - 1; it != it_end; ++it)
-	for(expression_vector::const_iterator jt = it + 1, 
-	      jt_end = expr->get_operands().end(); jt != jt_end; ++jt)
-	  {
-	    ops.push_back(_exp_factory->create_expression(fs, *it, *jt));
-	  }
-      return simplification(_exp_factory->create_expression(function_symbol::AND, std::move(ops)));
-    }
+  attribute_set::const_iterator it = attr.find(keyword::DEFINITION);
 
-  const expression_vector & ops = expr->get_operands();
-  expression_vector simp_ops;
-  simp_ops.reserve(ops.size());
-  for(expression_vector::const_iterator it = ops.begin(), it_end = ops.end();
-      it != it_end; ++it)
+  if(it != attr.end())
     {
-      simp_ops.push_back(simplification(*it));
-    }
+      function_definition_attribute_value * value = 
+	dynamic_cast<function_definition_attribute_value *>(it->get_value());
+      assert(value != 0);
+      const function_definition & def = value->get_value();
 
-  if(expr->is_not())
-    {
-      if(simp_ops[0]->is_true())
-	return _exp_factory->FALSE_EXPRESSION();
-      else if(simp_ops[0]->is_false())
-	return _exp_factory->TRUE_EXPRESSION();
-      else 
-	return _exp_factory->create_expression(function_symbol::NOT, std::move(simp_ops));
-    }
-  if(expr->is_and())
-    {
-      /* Removing trues and falses from and */
-      expression_vector::iterator wt = simp_ops.begin();
-      for(expression_vector::const_iterator it = simp_ops.begin(),
-	    it_end = simp_ops.end(); it != it_end; ++it)
-	{
-	  if((*it)->is_true())
-	    continue;
-	    
-	  *wt++ = *it;
-	    
-	  if((*it)->is_false())
-	    break;
-	}
-      simp_ops.erase(wt, simp_ops.end());
-      if(simp_ops.empty())
-	return _exp_factory->TRUE_EXPRESSION();
-      else if(simp_ops.back()->is_false())
-	return _exp_factory->FALSE_EXPRESSION();
-      else if(simp_ops.size() == 1)
-	return simp_ops[0];
-      else
-	return _exp_factory->create_expression(function_symbol::AND, std::move(simp_ops));
-    }
-  else if(expr->is_or())
-    {
-      /* Removing trues and falses from or */
-      expression_vector::iterator wt = simp_ops.begin();
-      for(expression_vector::const_iterator it = simp_ops.begin(),
-	    it_end = simp_ops.end(); it != it_end; ++it)
-	{
-	  if((*it)->is_false())
-	    continue;
-	  
-	  *wt++ = *it;
-	  
-	  if((*it)->is_true())
-	    break;
-	}
-      simp_ops.erase(wt, simp_ops.end());
-      if(simp_ops.empty())
-	return _exp_factory->FALSE_EXPRESSION();
-      else if(simp_ops.back()->is_true())
-	return _exp_factory->TRUE_EXPRESSION();
-      else if(simp_ops.size() == 1)
-	return simp_ops[0];
-      else
-	return _exp_factory->create_expression(function_symbol::OR, std::move(simp_ops));
-    }
-  else if(expr->is_implication())
-    {
-      /* Removing trues and falses from imp */
-      expression right_side = simp_ops.back();
-      simp_ops.pop_back();
-      expression_vector::iterator wt = simp_ops.begin();
-      for(expression_vector::const_iterator it = simp_ops.begin(),
-	    it_end = simp_ops.end(); it != it_end; ++it)
-	{
-	  if((*it)->is_true())
-	    continue;
-	    
-	  *wt++ = *it;
-	    
-	  if((*it)->is_false())
-	    break;
-	}
-      simp_ops.erase(wt, simp_ops.end());
-	
-      if(simp_ops.empty())
-	return right_side; 
-      else if(simp_ops.back()->is_false())
-	return _exp_factory->TRUE_EXPRESSION();
-      else if(right_side->is_true())
-	return _exp_factory->TRUE_EXPRESSION();
-      else if(right_side->is_false())
-	{
-	  expression left_side = simp_ops.size() > 1 ? 			      
-	    _exp_factory->create_expression(function_symbol::AND, std::move(simp_ops)) : simp_ops[0];
-	  return _exp_factory->create_expression(function_symbol::NOT, left_side);
-	}
-      else
-	{
-	  simp_ops.push_back(right_side);
-	  return _exp_factory->create_expression(function_symbol::IMPLIES, std::move(simp_ops));
-	}
-    }
-  else if(expr->is_equivalence())
-    {
-      if(simp_ops[0]->is_true())
-	{
-	  if(simp_ops[1]->is_true())
-	    return _exp_factory->TRUE_EXPRESSION();
-	  else if(simp_ops[1]->is_false())
-	    return _exp_factory->FALSE_EXPRESSION();
-	  else
-	    return simp_ops[1];
-	}
-      else if(simp_ops[0]->is_false())
-	{
-	  if(simp_ops[1]->is_true())
-	    return _exp_factory->FALSE_EXPRESSION();
-	  else if(simp_ops[1]->is_false())
-	    return _exp_factory->TRUE_EXPRESSION();
-	  else 
-	    return _exp_factory->create_expression(function_symbol::NOT, simp_ops[1]);
-	}
-      else if(simp_ops[1]->is_true())
-	return simp_ops[0];
-      else if(simp_ops[1]->is_false())
-	return _exp_factory->create_expression(function_symbol::NOT, simp_ops[0]);
-      else
-	return _exp_factory->create_expression(function_symbol::EQ, std::move(simp_ops));
-    }
-  else if(expr->is_inequivalence())
-    {
-      if(simp_ops[0]->is_true())
-	{
-	  if(simp_ops[1]->is_true())
-	    return _exp_factory->FALSE_EXPRESSION();
-	  else if(simp_ops[1]->is_false())
-	    return _exp_factory->TRUE_EXPRESSION();
-	  else
-	    return _exp_factory->create_expression(function_symbol::NOT, simp_ops[1]);
-	}
-      else if(simp_ops[0]->is_false())
-	{
-	  if(simp_ops[1]->is_true())
-	    return _exp_factory->TRUE_EXPRESSION();
-	  else if(simp_ops[1]->is_false())
-	    return _exp_factory->FALSE_EXPRESSION();
-	  else
-	    return simp_ops[1];
-	}
-      else if(simp_ops[1]->is_true())
-	return _exp_factory->create_expression(function_symbol::NOT, simp_ops[0]);
-      else if(simp_ops[1]->is_false())
-	return simp_ops[0];
-      else 
-	return  _exp_factory->create_expression(function_symbol::DISTINCT, std::move(simp_ops));
-    }
-  else if(expr->is_xor())
-    {
-      // s1 ^ s2 ^ ... ^ sn ^ T   <=> ~(s1 ^ ... ^ sn) <=> s1 ^ ... ^ ~sn
-      // s1 ^ s2 ^ ... ^ sn ^ F   <=> s1 ^ ... ^ sn
-      // even number of T's do not change anything, even number of T's 
-      // flips the last literal. F's are ignored.
+      const sorted_variable_vector & vars = def.get_variables();
+      expression def_exp = def.get_expression();
 
-      unsigned count_trues = 0;
-      expression_vector::iterator wt = simp_ops.begin();
-      for(expression_vector::const_iterator it = simp_ops.begin(),
-	    it_end = simp_ops.end(); it != it_end; ++it)
-	{
-	  if((*it)->is_true())
-	    count_trues++;
-	  else if(!(*it)->is_false())
-	    *wt++ = *it;
-	}
-      simp_ops.erase(wt, simp_ops.end());
+      substitution sub;
+      sorted_variable_vector::const_iterator 
+	vit = vars.begin(), 
+	vit_end = vars.end();
+      expression_vector::const_iterator eit = ops.begin();
 
-      if(count_trues % 2 == 0)
+      assert(vars.size() == ops.size());
+      
+      for(; vit != vit_end; ++vit, ++eit)
 	{
-	  if(simp_ops.empty())
-	    return _exp_factory->FALSE_EXPRESSION();
-	  else if(simp_ops.size() == 1)
-	    return simp_ops[0];
-	  else
-	    return _exp_factory->create_expression(function_symbol::XOR, std::move(simp_ops));
-	}
-      else
-	{
-	  if(simp_ops.empty())
-	    return _exp_factory->TRUE_EXPRESSION();
-	  else if(simp_ops.size() == 1)
-	    return _exp_factory->create_expression(function_symbol::NOT, simp_ops[0]);
-	  else 
-	    {
-	      simp_ops.back() = _exp_factory->create_expression(function_symbol::NOT, simp_ops.back());
-	      return _exp_factory->create_expression(function_symbol::XOR, std::move(simp_ops));
-	    }
+	  sub.insert(std::make_pair(vit->get_variable(), *eit)); 
 	}
 
+      return def_exp->get_instance(sub)->eliminate_let_binders();
     }
-  else if(expr->is_ite())
-    {
-      // the first two works both form terms and formulae
-      // if T then A else B  = A
-      // if F then A else B  = B
-      // just formulae
-      // if C then T else T  = T
-      // if C then T else F  = C
-      // if C then T else B  = C /\ T \/ ~C /\ B = C \/ (~C /\ B) = C \/ B
-      // if C then F else F  = F
-      // if C then F else T  = ~C
-      // if C then F else B  = C /\ F \/ ~C /\ B = F \/ (~C /\ B) = ~C /\ B
-      // if C then A else T  = C /\ A \/ ~C /\ T = (C /\ A) \/ ~C = ~C \/ A
-      // if C then A else F  = C /\ A \/ ~C /\ F = (C /\ A) \/ F = C /\ A
-      if(simp_ops[0]->is_true())
-	return simp_ops[1];
-      else if(simp_ops[0]->is_false())
-	return simp_ops[2];
-      else if(simp_ops[1]->is_true())
-	{
-	  if(simp_ops[2]->is_true())
-	    return _exp_factory->TRUE_EXPRESSION();
-	  else if(simp_ops[2]->is_false())
-	    return simp_ops[0];
-	  else
-	    return _exp_factory->create_expression(function_symbol::OR, simp_ops[0], simp_ops[2]);
-	}
-      else if(simp_ops[1]->is_false())
-	{
-	  if(simp_ops[2]->is_true())
-	    return _exp_factory->create_expression(function_symbol::NOT, simp_ops[0]);
-	  else if(simp_ops[2]->is_false())
-	    return _exp_factory->FALSE_EXPRESSION();
-	  else 
-	    {
-	      expression not_c = _exp_factory->create_expression(function_symbol::NOT, simp_ops[0]);
-	      return _exp_factory->create_expression(function_symbol::AND, not_c, simp_ops[2]);
-	    }									 
-	}
-      else if(simp_ops[2]->is_true())
-	{
-	  expression not_c = _exp_factory->create_expression(function_symbol::NOT, simp_ops[0]);
-	  return _exp_factory->create_expression(function_symbol::OR, not_c, simp_ops[1]);
-	}
-      else if(simp_ops[2]->is_false())
-	return _exp_factory->create_expression(function_symbol::AND, simp_ops[0], simp_ops[1]);
-      else
-	return _exp_factory->create_expression(function_symbol::ITE, simp_ops[0], simp_ops[1], simp_ops[2]);
-    }
-  else 
-    return _exp_factory->create_expression(expr->get_symbol(), std::move(simp_ops));
+  else
+    return e;
 }
+
+void formula_transformer::check_definition(const expression & expr, std::vector<clause *> & clauses)
+{
+  expression expanded_expr = try_expand_def(expr);
+  if(expanded_expr != expr)
+    {
+      //std::cout << "EXPANDING: " << expr << " TO " << expanded_expr << std::endl;
+      expression eq = _exp_factory->create_expression(function_symbol::EQ, expr, expanded_expr);
+      if(_names.find(eq) == _names.end())
+	{
+	  expression eq_name;
+	  cnf_transformation(eq, clauses, eq_name);
+	  clause * eq_unit = new clause();
+	  eq_unit->push_back(eq_name);
+	  clauses.push_back(eq_unit);
+	}
+    }
+}
+
 
 void formula_transformer::cnf_transformation(const expression & expr, 
 					     std::vector<clause *> & clauses, 
@@ -339,15 +95,6 @@ void formula_transformer::cnf_transformation(const expression & expr,
   static const std::string cnf_prefix = std::string("uniq");
   static const std::string ite_prefix = std::string("ite");
   
-  // This covers special constants, variables, constant functions and quantifiers
-  if(!expr->is_function() || expr->get_operands().empty())
-    {
-      name = expr;
-      if(!expr->is_variable())
-	set_sort_constant(expr);
-      return;
-    }
-
   auto it = _names.find(expr);
   if(it != _names.end())
     {
@@ -355,12 +102,271 @@ void formula_transformer::cnf_transformation(const expression & expr,
       return;
     }
   
+  // This covers special constants, variables, constant functions and quantifiers
+  if(!expr->is_function() || expr->get_operands().empty())
+    {
+      name = expr;
+
+      if(!expr->is_variable())
+	set_sort_constant(expr);
+
+      if(expr->is_constant_function())
+	{
+	  register_name(expr, name);
+	  check_definition(expr, clauses);
+	}            
+      return;
+    }
+  
+  unsigned clauses_size = clauses.size();
+  unsigned names_size = _names_vector.size();
+
+  /* Binarization of chainables */
+  if(is_chainable(expr) && expr->get_operands().size() > 2)
+    {
+
+      // (fs t1 t2 ... tn) <=> (fs t1 t2) /\ (fs t2 t3) /\ ... /\ (fs tn-1 tn)
+      //       s           <=>    s1      /\    s2      /\ ... /\     sn-1
+      //  ~s \/ s1, ~s \/ s2, ...., ~s \/ s_n-1
+      // ~s1 \/ ~s2 \/ ... \/ ~sn-1 \/ s
+
+      const function_symbol & fs = expr->get_symbol();
+      name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
+      expression not_name = negate_name(name);
+      clause * long_clause = new clause();
+
+      for(expression_vector::const_iterator it = expr->get_operands().begin(),
+	    it_end = expr->get_operands().end() - 1; it != it_end; ++it)
+	{
+	  expression it_name;
+	  cnf_transformation(_exp_factory->create_expression(fs, *it, *(it + 1)), clauses, it_name);
+	  long_clause->push_back(negate_name(it_name));
+	  clause * short_clause = new clause();
+	  short_clause->push_back(it_name);
+	  short_clause->push_back(not_name);
+	  clauses.push_back(short_clause);
+	}
+      long_clause->push_back(name);
+      clauses.push_back(long_clause);
+      register_name(expr, name);
+      return;
+    }
+
+  /* Binarization of distinct and elimination of inequivalence */
+  if(expr->is_distinct() && (expr->get_operands().size() > 2 || expr->is_inequivalence()))
+    {
+      // (!= t1 t2 ... tn) <=> t1 != t2 /\ t1 != t3 /\ ... /\ tn-1 != tn
+      // (!= t1 t2 ... tn) <=> ~(t1 = t2) /\ ~(t1 = t3) /\ ... /\ ~(tn-1 = tn)
+      //       s           <=>    ~s12    /\    ~s13     /\ ... /\   ~sn-1,n
+      //  ~s \/ ~s12, ~s \/ ~s13, ... , ~s \/ ~sn-1,n
+      // s12 \/ s13 \/ ... \/ sn-1,n \/ s      
+      name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
+      expression not_name = negate_name(name);
+      clause * long_clause = new clause();      
+      for(expression_vector::const_iterator it = expr->get_operands().begin(),
+	    it_end = expr->get_operands().end() - 1; it != it_end; ++it)
+	for(expression_vector::const_iterator jt = it + 1, 
+	      jt_end = expr->get_operands().end(); jt != jt_end; ++jt)
+	  {
+	    expression it_name;
+	    cnf_transformation(_exp_factory->create_expression(function_symbol::EQ, *it, *jt), clauses, it_name);
+	    long_clause->push_back(it_name);
+	    clause * short_clause = new clause();
+	    short_clause->push_back(negate_name(it_name));
+	    short_clause->push_back(not_name);
+	    clauses.push_back(short_clause);	    
+	  }
+      long_clause->push_back(name);
+      clauses.push_back(long_clause);
+      register_name(expr, name);
+      return;
+    }
+
+  /* Binarization and elimination of xor */
+  if(expr->is_xor())
+    {
+      expression first;
+      if(expr->get_operands().size() > 2)
+	{
+	  expression_vector ops;
+	  ops.reserve(expr->get_operands().size() - 1);
+	  for(expression_vector::const_iterator it = expr->get_operands().begin(),
+		it_end = expr->get_operands().end() - 1; it != it_end; ++it)
+	    ops.push_back(*it);
+	  cnf_transformation(_exp_factory->create_expression(function_symbol::XOR, ops), clauses, first);	  
+	}
+      else
+	{
+	  cnf_transformation(expr->get_operands()[0], clauses, first);
+	}
+
+      expression second;
+      cnf_transformation(expr->get_operands().back(), clauses, second);
+      
+      name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
+      expression not_name = negate_name(name);
+      expression not_first = negate_name(first);
+      expression not_second = negate_name(second);
+      
+      if(first == second ||
+	 (is_true(first) && is_true(second)) ||
+	 (is_false(first) && is_false(second)))
+	{
+	  // SIMPLIFICATION: s1 === s2, only unit clause { ~s } is added
+	  retract_names(names_size);
+	  retract_clauses(clauses_size, clauses);
+	  clause * cl = new clause();
+	  cl->push_back(not_name);
+	  clauses.push_back(cl);
+	}
+      else if(first == negate_name(second) ||
+	      (is_true(first) && is_false(second)) ||
+	      (is_false(first) && is_true(second)))
+	{
+	  // SIMPLIFICATION: s1 === ~s2, only unit clause { s } is added
+	  retract_names(names_size);
+	  retract_clauses(clauses_size, clauses);
+	  clause *cl = new clause();
+	  cl->push_back(name);
+	  clauses.push_back(cl);
+	}
+      else if(is_true(first))
+	{
+	  // SIMPLIFICATION: s1 === true, then s <=> ~s2:  { ~s, ~s2 }, {s2, s }
+	  clause * cl = new clause();
+	  cl->push_back(not_second);
+	  cl->push_back(not_name);
+	  clauses.push_back(cl);
+	  cl = new clause();
+	  cl->push_back(second);
+	  cl->push_back(name);
+	  clauses.push_back(cl);
+	}
+      else if(is_false(first))
+	{
+	  // SIMPLIFICATION: s1 == false, then s <=> s2: { s, ~s2 }, {~s, s2}
+	  clause * cl = new clause();
+	  cl->push_back(not_second);
+	  cl->push_back(name);
+	  clauses.push_back(cl);
+	  cl = new clause();
+	  cl->push_back(second);
+	  cl->push_back(not_name);
+	  clauses.push_back(cl);	  
+	}
+      else if(is_true(second))
+	{
+	  // SIMPLIFICATION: s2 === true, then s <=> ~s1:  { ~s, ~s1 }, {s1, s }
+	  clause * cl = new clause();
+	  cl->push_back(first);
+	  cl->push_back(name);
+	  clauses.push_back(cl);
+	  cl = new clause();
+	  cl->push_back(not_first);
+	  cl->push_back(not_name);
+	  clauses.push_back(cl);
+	}
+      else if(is_false(second))
+	{
+	  // SIMPLIFICATION: s2 == false, then s <=> s1: { s, ~s1 }, {~s, s1}
+	  clause * cl = new clause();
+	  cl->push_back(not_first);
+	  cl->push_back(name);
+	  clauses.push_back(cl);
+	  cl = new clause();
+	  cl->push_back(first);
+	  cl->push_back(not_name);
+	  clauses.push_back(cl);	  
+	}
+      else {
+	// GENERAL CASE:
+	/* (s1 xor s2) <=> s	   
+	   (s1 \/ s2  \/ ~s) /\ (~s1 \/ ~s2 \/ ~s) /\
+	   (~s1 \/ s2 \/ s) /\ (~s2 \/ s1 \/ s)  */
+
+	clause * cl = new clause();	
+	cl->push_back(not_first);
+	cl->push_back(second);
+	cl->push_back(name);
+	clauses.push_back(cl);
+	
+	cl = new clause();
+	cl->push_back(first);
+	cl->push_back(not_second);
+	cl->push_back(name);
+	clauses.push_back(cl);
+
+	cl = new clause();
+	cl->push_back(first);
+	cl->push_back(second);
+	cl->push_back(not_name);
+	clauses.push_back(cl);
+	
+	cl = new clause();
+	cl->push_back(not_first);
+	cl->push_back(not_second);
+	cl->push_back(not_name);
+	clauses.push_back(cl);
+      }
+      
+      register_name(expr, name);
+      return;
+    }
+
+
+  /* Elimination of ite */
+  if(expr->is_ite())
+    {
+      name = get_unique_constant(cnf_prefix, expr->get_sort());
+      register_name(expr, name);
+      expression cond = expr->get_operands()[0];
+      expression first = expr->get_operands()[1];
+      expression second = expr->get_operands()[2];
+
+	          
+      if(is_true(cond))
+	{
+	  expression first_name;
+	  cnf_transformation(_exp_factory->create_expression(function_symbol::EQ, expr, first), clauses, first_name);
+	  clause * cl = new clause();
+	  cl->push_back(first_name);
+	  clauses.push_back(cl);
+	}
+      else if(is_false(cond))
+	{
+	  expression second_name;
+	  cnf_transformation(_exp_factory->create_expression(function_symbol::EQ, expr, second), clauses, second_name);
+	  clause * cl = new clause();
+	  cl->push_back(second_name);
+	  clauses.push_back(cl);
+	}
+      else
+	{
+	  expression first_name;
+	  expression second_name;
+	  expression cond_name;
+	  cnf_transformation(cond, clauses, cond_name);
+	  cnf_transformation(_exp_factory->create_expression(function_symbol::EQ, expr, first), clauses, first_name);
+	  cnf_transformation(_exp_factory->create_expression(function_symbol::EQ, expr, second), clauses, second_name);
+	  clause * cl = new clause();
+	  cl->push_back(negate_name(cond_name));
+	  cl->push_back(first_name);
+	  clauses.push_back(cl);
+	  cl = new clause();
+	  cl->push_back(cond_name);
+	  cl->push_back(second_name);
+	  clauses.push_back(cl);
+	}
+      return;
+    }
+  
+  
   expression_vector op_names;
   for(expression_vector::const_iterator it = expr->get_operands().begin(),
 	it_end = expr->get_operands().end(); it != it_end; ++it)
     {
       expression it_name;
-      cnf_transformation(*it, clauses, it_name);
+      cnf_transformation(*it, clauses, it_name);	
       op_names.push_back(it_name);
     }
 
@@ -373,49 +379,102 @@ void formula_transformer::cnf_transformation(const expression & expr,
   else if(expr->is_and())
     {
       /* s1 /\ s2 /\ ... /\ sn <=> s
-	 (~s1 \/ ~s2 \/ ... \/ ~sn \/ s) /\ (~s \/ (s1 /\ s2 /\ ... /\ sn))
 	 (~s1 \/ ~s2 \/ ... \/ ~sn \/ s) /\ (~s \/ s1) /\ (~s \/ s2) /\ ...
 	 /\ (~s \/ sn) */
 
       name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
       expression not_name = negate_name(name);
       clause * long_clause = new clause();
-	
+
+
+      bool false_present = false;
       for(expression_vector::const_iterator it = op_names.begin(),
 	    it_end = op_names.end(); it != it_end; ++it)
 	{
-	  clause * short_clause = new clause();
-	  short_clause->push_back(not_name);
-	  short_clause->push_back(*it);
-	  clauses.push_back(short_clause);
-	  long_clause->push_back(negate_name(*it));
+	  if(is_false(*it))
+	    false_present = true;
 	}
-      long_clause->push_back(name);
-      clauses.push_back(long_clause);	
+      
+      if(false_present)
+	{
+	  // SIMPLIFICATION: if one of si's is false, then only { ~s } unit
+	  // clause should be added (we retract names and clauses introduced
+	  // for si's)
+	  retract_clauses(clauses_size, clauses);
+	  retract_names(names_size);
+	  long_clause->push_back(not_name);
+	  clauses.push_back(long_clause);	  
+	}
+      else
+	{
+	  for(expression_vector::const_iterator it = op_names.begin(),
+		it_end = op_names.end(); it != it_end; ++it)
+	    {
+	      // SIMPLIFICATION: if si is true, clause ~s \/ si can be omitted.
+	      // Also, ~si is omitted from the long clause
+	      if(is_true(*it))
+		continue;
+	      
+	      clause * short_clause = new clause();
+	      short_clause->push_back(not_name);
+	      short_clause->push_back(*it);
+	      clauses.push_back(short_clause);
+	      long_clause->push_back(negate_name(*it));
+	    }
+	  long_clause->push_back(name);
+	  clauses.push_back(long_clause);
+	}
     }
   else if(expr->is_or())
     {
       /* s1 \/ s2 \/ ... \/ sn <=> s
-	 (~s1 /\ ~s2 /\ ... /\ ~sn) \/ s) /\ (s1 \/ s2 \/ ... \/ sn \/ ~s)
 	 (~s1 \/ s) /\ (~s2 \/ s) /\ ... /\ (~sn \/ s) /\ 
 	 (s1 \/ s2 \/ ... \/ sn \/ ~s) */
 	
       name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
       expression not_name = negate_name(name);
       clause * long_clause = new clause();
-	
+
+      bool true_present = false;
       for(expression_vector::const_iterator it = op_names.begin(),
 	    it_end = op_names.end(); it != it_end; ++it)
 	{
-	  clause * short_clause = new clause();
-
-	  short_clause->push_back(name);
-	  short_clause->push_back(negate_name(*it));
-	  clauses.push_back(short_clause);
-	  long_clause->push_back(*it);
+	  if(is_true(*it))
+	    true_present = true;
 	}
-      long_clause->push_back(not_name);
-      clauses.push_back(long_clause);	
+
+      
+      if(true_present)
+	{
+	  // SIMPLIFICATION: if one of si's is true, then only { s } unit
+	  // clause should be added (we retract names and clauses introduced
+	  // for si's)
+	  retract_clauses(clauses_size, clauses);
+	  retract_names(names_size);
+	  long_clause->push_back(name);
+	  clauses.push_back(long_clause);	  
+	}
+      else
+	{
+	  for(expression_vector::const_iterator it = op_names.begin(),
+		it_end = op_names.end(); it != it_end; ++it)
+	    {
+
+	      // SIMPLIFICATION: if si is false, clause ~si \/ s can be omitted.
+	      // Also, si is omitted from the long clause
+	      if(is_false(*it))
+		continue;
+
+	      clause * short_clause = new clause();
+	      
+	      short_clause->push_back(name);
+	      short_clause->push_back(negate_name(*it));
+	      clauses.push_back(short_clause);
+	      long_clause->push_back(*it);
+	    }
+	  long_clause->push_back(not_name);
+	  clauses.push_back(long_clause);
+	}
     }
   else if(expr->is_implication())
     {
@@ -430,267 +489,182 @@ void formula_transformer::cnf_transformation(const expression & expr,
       name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
       expression not_name = negate_name(name);
       clause * long_clause = new clause();
-	
+
+      bool true_present = false;
       for(expression_vector::const_iterator it = op_names.begin(),
 	    it_end = op_names.end(); it != it_end; ++it)
 	{
-	  clause * short_clause = new clause();
-	    
-	  short_clause->push_back(name);
-	  if(it != it_end - 1)
-	    {
-	      short_clause->push_back(*it);
-	      long_clause->push_back(negate_name(*it));
-	    }
-	  else
-	    {
-	      short_clause->push_back(negate_name(*it));
-	      long_clause->push_back(*it);
-	    }
-	  clauses.push_back(short_clause);	   
+	  expression si = it == it_end - 1 ? *it : negate_name(*it);
+	  
+	  if(is_true(si))
+	    true_present = true;
 	}
-      long_clause->push_back(not_name);
-      clauses.push_back(long_clause);	
+      
+      if(true_present)
+	{
+	  // SIMPLIFICATION: if one of (~)si's is true, then only { s } unit
+	  // clause should be added (we retract names and clauses introduced
+	  // for si's)
+	  retract_clauses(clauses_size, clauses);
+	  retract_names(names_size);
+	  long_clause->push_back(name);
+	  clauses.push_back(long_clause);	  
+	}
+      else
+	{
+      
+	  for(expression_vector::const_iterator it = op_names.begin(),
+		it_end = op_names.end(); it != it_end; ++it)
+	    {
+	      expression si = it == it_end - 1 ? *it : negate_name(*it);
+
+	      // SIMPLIFICATION: if (~)si is false, clause (~)si \/ s can be omitted.
+	      // Also, (~)si is omitted from the long clause
+	      if(is_false(si))
+		continue;
+	      
+	      clause * short_clause = new clause();	      
+	      short_clause->push_back(name);
+	      short_clause->push_back(negate_name(si));
+	      long_clause->push_back(si);
+	      clauses.push_back(short_clause);	   
+	    }
+	  long_clause->push_back(not_name);
+	  clauses.push_back(long_clause);
+	}
     }
   else if(expr->is_equivalence()) 
-    {
-      /* (s1 <=> s2) <=> s
-	 (~s1 \/ s2) /\ (s1 \/ ~s2) <=> s
-	 ((~s1 \/ s2) /\ (s1 \/ ~s2))  \/ ~s    /\
-	 (s1 /\ ~s2) \/ (~s1 /\ s2) \/ s
-	   
-	 (~s1 \/ s2  \/ ~s) /\ (s1 \/ ~s2 \/ ~s) /\
-	 (s1 \/ s2 \/ s) /\ (~s2 \/ ~s1 \/ s)  */
-	
+    {	
       name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
       expression not_name = negate_name(name);
-
       expression not_first = negate_name(op_names[0]);
       expression not_second = negate_name(op_names[1]);
-
-      clause * cl = new clause();	
-      cl->push_back(not_first);
-      cl->push_back(op_names[1]);
-      cl->push_back(not_name);
-      clauses.push_back(cl);
-	
-      cl = new clause();
-      cl->push_back(op_names[0]);
-      cl->push_back(not_second);
-      cl->push_back(not_name);
-      clauses.push_back(cl);
-
-      cl = new clause();
-      cl->push_back(op_names[0]);
-      cl->push_back(op_names[1]);
-      cl->push_back(name);
-      clauses.push_back(cl);
-	
-      cl = new clause();
-      cl->push_back(not_first);
-      cl->push_back(not_second);
-      cl->push_back(name);
-      clauses.push_back(cl);
-    }
-  else if(expr->is_inequivalence())
-    {
-      /* (s1 != s2) <=> s
-	 (s1 <=> s2) <=> ~s
-	 (~s1 \/ s2) /\ (s1 \/ ~s2) <=> ~s
-	 ((~s1 \/ s2) /\ (s1 \/ ~s2))  \/ s    /\
-	 (s1 /\ ~s2) \/ (~s1 /\ s2) \/ ~s
-	   
-	 (~s1 \/ s2  \/ s) /\ (s1 \/ ~s2 \/ s) /\
-	 (s1 \/ s2 \/ ~s) /\ (~s2 \/ ~s1 \/ ~s)  */
-      name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
-      expression not_name = negate_name(name);
-
-      expression not_first = negate_name(op_names[0]);
-      expression not_second = negate_name(op_names[1]);
-
-      clause * cl = new clause();	
-      cl->push_back(not_first);
-      cl->push_back(op_names[1]);
-      cl->push_back(name);
-      clauses.push_back(cl);
-	
-      cl = new clause();
-      cl->push_back(op_names[0]);
-      cl->push_back(not_second);
-      cl->push_back(name);
-      clauses.push_back(cl);
-
-      cl = new clause();
-      cl->push_back(op_names[0]);
-      cl->push_back(op_names[1]);
-      cl->push_back(not_name);
-      clauses.push_back(cl);
-	
-      cl = new clause();
-      cl->push_back(not_first);
-      cl->push_back(not_second);
-      cl->push_back(not_name);
-      clauses.push_back(cl);
-    }
-  else if(expr->is_xor())
-    {
-      // The same as for inequivalence, but with binarization.
-      expression_vector::const_iterator it = op_names.begin(), it_end = op_names.end();
-      name = *it;
-      it++;
-      for(;it != it_end; ++it)
+      
+      if(op_names[0] == op_names[1] ||
+	 (is_true(op_names[0]) && is_true(op_names[1])) ||
+	 (is_false(op_names[0]) && is_false(op_names[1])))
 	{
-	  expression first = name;
-	  expression second = *it;
-	    
-	  name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
-	  expression not_name = negate_name(name);
-
-	    
-	  expression not_first = negate_name(first);
-	  expression not_second = negate_name(second);
-
-	  clause * cl = new clause();	
-	  cl->push_back(not_first);
-	  cl->push_back(second);
+	  // SIMPLIFICATION: s1 === s2, only unit clause { s } is added
+	  retract_names(names_size);
+	  retract_clauses(clauses_size, clauses);
+	  clause * cl = new clause();
 	  cl->push_back(name);
 	  clauses.push_back(cl);
+	}
+      else if(op_names[0] == negate_name(op_names[1]) ||
+	      (is_true(op_names[0]) && is_false(op_names[1])) ||
+	      (is_false(op_names[0]) && is_true(op_names[1])))
 	
-	  cl = new clause();
-	  cl->push_back(first);
-	  cl->push_back(not_second);
-	  cl->push_back(name);
-	  clauses.push_back(cl);
-
-	  cl = new clause();
-	  cl->push_back(first);
-	  cl->push_back(second);
-	  cl->push_back(not_name);
-	  clauses.push_back(cl);
-	
-	  cl = new clause();
-	  cl->push_back(not_first);
-	  cl->push_back(not_second);
+	{
+	  // SIMPLIFICATION: s1 === ~s2, only unit clause { ~s } is added
+	  retract_names(names_size);
+	  retract_clauses(clauses_size, clauses);
+	  clause *cl = new clause();
 	  cl->push_back(not_name);
 	  clauses.push_back(cl);
 	}
-    }
-  else if(expr->is_ite())
-    {
-      if(expr->is_formula())
+      else if(is_true(op_names[0]))
 	{
-	  /* Bool case:
-	  // if C then A else B  <=> (C /\ A) \/ (~C /\ B) <=> s
-	  // ((~C \/ ~A) /\ (C \/ ~B)) \/ s    /\
-	  // ~s \/ (C /\ A) \/ (~C /\ B)   <=>
-	  // (~C \/ ~A \/ s) /\ (C \/ ~B \/ s)   /\
-	  // (~s \/ C \/ B) /\ (~s \/ A \/ ~C) /\ (~s \/ A \/ B) <=>
-	  // (~C \/ ~A \/ s) /\ (C \/ ~B \/ s)  /\
-	  // (~s \/ C \/ B) /\ (~s \/ A \/ ~C)
-	  // (the last clause ~s \/ A \/ B is the resolvent of previous two)
-	  */
-	  name = get_unique_constant(cnf_prefix, _sort_factory->BOOL_SORT());
-	  expression not_name = negate_name(name);
-	  const expression & c = op_names[0];
-	  const expression & a = op_names[1];
-	  const expression & b = op_names[2];
-	  expression not_c = negate_name(c);
-	  expression not_a = negate_name(a);
-	  expression not_b = negate_name(b);
-
+	  // SIMPLIFICATION: s1 === true, then s <=> s2:  { ~s, s2 }, {~s2, s }
 	  clause * cl = new clause();
-	  cl->push_back(not_c);
-	  cl->push_back(not_a);
+	  cl->push_back(op_names[1]);
+	  cl->push_back(not_name);
+	  clauses.push_back(cl);
+	  cl = new clause();
+	  cl->push_back(not_second);
 	  cl->push_back(name);
 	  clauses.push_back(cl);
-	    
-	  cl = new clause();
-	  cl->push_back(c);
-	  cl->push_back(not_b);
+	}
+      else if(is_false(op_names[0]))
+	{
+	  // SIMPLIFICATION: s1 == false, then s <=> ~s2: { s, s2 }, {~s, ~s2}
+	  clause * cl = new clause();
+	  cl->push_back(op_names[1]);
 	  cl->push_back(name);
 	  clauses.push_back(cl);
-
 	  cl = new clause();
+	  cl->push_back(not_second);
 	  cl->push_back(not_name);
-	  cl->push_back(c);
-	  cl->push_back(b);
+	  clauses.push_back(cl);	  
+	}
+      else if(is_true(op_names[1]))
+	{
+	  // SIMPLIFICATION: s2 === true, then s <=> s1:  { ~s, s1 }, {~s1, s }
+	  clause * cl = new clause();
+	  cl->push_back(op_names[0]);
+	  cl->push_back(not_name);
 	  clauses.push_back(cl);
-
 	  cl = new clause();
-	  cl->push_back(not_name);
-	  cl->push_back(a);
-	  cl->push_back(not_c);
+	  cl->push_back(not_first);
+	  cl->push_back(name);
 	  clauses.push_back(cl);
-
-	  // this clause is the resolvent of the previous two
-	  //cl = new clause();
-	  //cl->push_back(not_name);
-	  //cl->push_back(a);
-	  //cl->push_back(b);
-	  //clauses.push_back(cl);
+	}
+      else if(is_false(op_names[1]))
+	{
+	  // SIMPLIFICATION: s2 == false, then s <=> ~s1: { s, s1 }, {~s, ~s1}
+	  clause * cl = new clause();
+	  cl->push_back(op_names[0]);
+	  cl->push_back(name);
+	  clauses.push_back(cl);
+	  cl = new clause();
+	  cl->push_back(not_first);
+	  cl->push_back(not_name);
+	  clauses.push_back(cl);	  
 	}
       else {
-	// Non-bool case:
-	// if C then A else B = s,  (C /\ s = A)  \/ (~C /\ s = B)
-	// C /\ sA \/ ~C /\ sB  <=> 
-	// C \/ sB /\ sA \/ ~C  /\  sA \/ sB <=>
-	// C \/ sB /\ sA \/ ~C  (sA \/ sB is the resolvent)
-	name = get_unique_constant(ite_prefix, expr->get_inferred_sort());
-	expression sA = _exp_factory->create_expression(function_symbol::EQ, name, op_names[1]);
-	expression sB = _exp_factory->create_expression(function_symbol::EQ, name, op_names[2]);
-	const expression & c = op_names[0];
-	expression not_c = negate_name(c);
+	// GENERAL CASE:
+	/* (s1 <=> s2) <=> s
+	 (~s1 \/ s2  \/ ~s) /\ (s1 \/ ~s2 \/ ~s) /\
+	 (s1 \/ s2 \/ s) /\ (~s2 \/ ~s1 \/ s)  */
 
-	clause * cl = new clause();
-	cl->push_back(c);
-	cl->push_back(sB);
+	clause * cl = new clause();	
+	cl->push_back(not_first);
+	cl->push_back(op_names[1]);
+	cl->push_back(not_name);
+	clauses.push_back(cl);
+	
+	cl = new clause();
+	cl->push_back(op_names[0]);
+	cl->push_back(not_second);
+	cl->push_back(not_name);
 	clauses.push_back(cl);
 
 	cl = new clause();
-	cl->push_back(not_c);
-	cl->push_back(sA);
+	cl->push_back(op_names[0]);
+	cl->push_back(op_names[1]);
+	cl->push_back(name);
 	clauses.push_back(cl);
-
-	// sA \/ sB is the resolvent of previous two clauses
-	//cl = new clause();
-	//cl->push_back(sA);
-	//cl->push_back(sB);
-	//clauses.push_back(cl);
+	
+	cl = new clause();
+	cl->push_back(not_first);
+	cl->push_back(not_second);
+	cl->push_back(name);
+	clauses.push_back(cl);
       }
     }
   else
     {
-      name = _exp_factory->create_expression(expr->get_symbol(), std::move(op_names));    
+      name = _exp_factory->create_expression(expr->get_symbol(), std::move(op_names));
+      register_name(expr, name);
+      check_definition(expr, clauses);
+      return;
     }
-
-  _names.insert(std::make_pair(expr, name));
-  _named_exprs.insert(std::make_pair(name, expr));
-  //  std::cout << "NAME: " << name << " FOR: " << expr << std::endl;
+  register_name(expr, name);
 }
+
 
 void formula_transformer::top_level_cnf_transformation(const expression & expr, 
 						       std::vector<clause *> & clauses)
 {
-  if(expr->is_true())
+  if(is_true(expr))
     return;
-  else if(expr->is_false())
+
+  if(is_false(expr))
     {
-      clauses.clear();
       clauses.push_back(new clause());
       return;
     }
-  else if(expr->is_and())
-    {
-      for(expression_vector::const_iterator it = expr->get_operands().begin(),
-	    it_end = expr->get_operands().end(); it != it_end; ++it)
-	{
-	  top_level_cnf_transformation(*it, clauses);
-	  if(clauses.back()->size() == 0)
-	    break;
-	}
-      return;
-    }
-    
+  
   expression name;
   cnf_transformation(expr, clauses, name);
   clause * name_unit = new clause();

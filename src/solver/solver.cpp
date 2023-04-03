@@ -435,6 +435,7 @@ void solver::initialize_solver()
   // Counting literal occurrences in initial clauses
   for(unsigned i = 0; i < _initial_clauses.size(); i++)
     {
+      //std::cout << "Clause: " << *_initial_clauses[i] << std::endl;
       unsigned k = 0;
       std::unordered_set<expression> cache;
       for(unsigned j = 0; j < _initial_clauses[i]->size(); j++)
@@ -696,8 +697,19 @@ void solver::skolemize(const expression & l)
   expression name;
   std::vector<clause *> clauses;
   _formula_transformer->cnf_transformation(f, clauses, name);
-
-  // forall x1...xn.~F(x1,...,xn) \/ name /\ (def_clauses)
+  
+  if(_formula_transformer->is_true(name))
+    return;
+  
+  if(_formula_transformer->is_false(name))
+    {
+      clause * cl = new clause();
+      cl->push_back(get_literal_data(l)->get_opposite());
+      apply_theory_lemma(cl);
+      return;      
+    }
+  
+  // (forall x1...xn.~F(x1,...,xn) \/ name) /\ (def_clauses)
 
   apply_introduce_literal(name);
   clause * cl = new clause();  
@@ -733,13 +745,8 @@ void solver::instantiate(const expression & l, const expression_vector & gterms)
   const sorted_variable_vector & svars = l->get_quantified_variables();
   assert(svars.size() == gterms.size());
   substitution sub;
-  bool simp_needed = false;
   for(unsigned i = 0; i < svars.size(); i++)
-    {
-      if(gterms[i] == _factory->TRUE_EXPRESSION() || gterms[i] == _factory->FALSE_EXPRESSION())
-	simp_needed = true;
-      sub.insert(std::make_pair(svars[i].get_variable(), gterms[i]));
-    }
+    sub.insert(std::make_pair(svars[i].get_variable(), gterms[i]));
   expression f = l->get_subexpression()->get_instance(sub);
 
   literal_data * ldata = get_literal_data(l);
@@ -759,23 +766,22 @@ void solver::instantiate(const expression & l, const expression_vector & gterms)
   
   // exists x1...xn. ~F(x1,...,xn) \/ F(t1,...,tn)
 
-  expression f_simp = simp_needed ? _formula_transformer->simplification(f) : f;
+  // cnf_transformation of F(t1,...,tn) -> name, def_clauses
+  expression name;
+  std::vector<clause *> clauses;
+  _formula_transformer->cnf_transformation(f, clauses, name);
   
-  if(f_simp == _factory->TRUE_EXPRESSION())
+  if(_formula_transformer->is_true(name))
     return;
-
-  if(f_simp == _factory->FALSE_EXPRESSION())
+  
+  if(_formula_transformer->is_false(name))
     {
       clause * cl = new clause();
       cl->push_back(get_literal_data(l)->get_opposite());
       apply_theory_lemma(cl);
-      return;
+      return;      
     }
   
-  // cnf_transformation of F(t1,...,tn) -> name, def_clauses
-  expression name;
-  std::vector<clause *> clauses;
-  _formula_transformer->cnf_transformation(f_simp, clauses, name);
   
   // exists x1...xn. ~F(x1,...,xn) \/ name /\ (def_clauses)
   apply_introduce_literal(name);

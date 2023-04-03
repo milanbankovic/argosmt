@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "clause.hpp"
 #include "proofs.hpp"
 
-/* Simplifies formula and transforms it to CNF form */
+/* Transforms formulae to CNF form */
 class formula_transformer {
 private:
   expression_factory * _exp_factory;
@@ -31,6 +31,7 @@ private:
   static unsigned long _count;
   std::unordered_map<expression, expression> _names;
   std::unordered_map<expression, expression> _named_exprs;
+  expression_vector _names_vector;
   std::unordered_map<sort, expression> _sort_constants;
   
   bool is_chainable(const expression & e)
@@ -43,14 +44,11 @@ private:
       fs == function_symbol::GT ||
       fs == function_symbol::GE;
   }
+  
+  expression try_expand_def(const expression & e);
 
-  bool is_pairwise(const expression & e)
-  {
-    const function_symbol & fs = e->get_symbol();
-    return 
-      fs == function_symbol::DISTINCT;
-  }
-
+  void check_definition(const expression & expr, std::vector<clause *> & clauses);
+  
   expression negate_name(const expression & name)
   {
     if(name->is_not())
@@ -68,7 +66,37 @@ private:
 	_sort_constants.insert(std::make_pair(es, iexpr));
       }
   }
-  
+
+  void register_name(const expression & expr, const expression & name)
+  {
+    _names.insert(std::make_pair(expr, name));
+    _named_exprs.insert(std::make_pair(name, expr));
+    _names_vector.push_back(name);
+  }
+
+  void retract_names(unsigned size)
+  {
+    while(_names_vector.size() > size)
+      {
+	expression name = _names_vector.back();
+	expression expr = _named_exprs[name];
+	_names.erase(expr);
+	_named_exprs.erase(name);
+	_names_vector.pop_back();
+      }
+  }
+
+
+  void retract_clauses(unsigned size, std::vector<clause *> & clauses)
+  {
+    while(clauses.size() > size)
+      {
+	clause * cl = clauses.back();
+	delete cl;
+	clauses.pop_back();
+      }
+  }
+
 public:
   formula_transformer(expression_factory * factory)
     :_exp_factory(factory),
@@ -82,6 +110,23 @@ public:
       _sig = _sig->get_expansion_signature();
   }
 
+  bool is_true(const expression & e)
+  {
+    static const expression TRUE = _exp_factory->TRUE_EXPRESSION();
+    static const expression NOT_FALSE = _exp_factory->create_expression(function_symbol::NOT,
+									_exp_factory->FALSE_EXPRESSION());
+    return e == TRUE || e == NOT_FALSE;
+  }
+
+
+  bool is_false(const expression & e)
+  {
+    static const expression FALSE = _exp_factory->FALSE_EXPRESSION();
+    static const expression NOT_TRUE = _exp_factory->create_expression(function_symbol::NOT,
+								       _exp_factory->TRUE_EXPRESSION());
+    return e == FALSE || e == NOT_TRUE;
+  }
+  
   expression get_unique_constant(const std::string & prefix, const sort & s)
   {
     function_symbol uniq_name(prefix + std::to_string(++_count));
@@ -105,9 +150,7 @@ public:
 	return sc;										 
       }
   }
-  
-  expression simplification(const expression & expr);
-  
+    
   void cnf_transformation(const expression & expr, 
 			  std::vector<clause *> & clauses, 
 			  expression & name);
