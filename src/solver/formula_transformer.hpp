@@ -33,6 +33,7 @@ private:
   std::unordered_map<expression, expression> _named_exprs;
   expression_vector _names_vector;
   std::unordered_map<sort, expression> _sort_constants;
+  bool _produce_proofs;
   
   bool is_chainable(const expression & e)
   {
@@ -102,7 +103,8 @@ public:
     :_exp_factory(factory),
      _names(HASH_TABLE_SIZE),
      _named_exprs(HASH_TABLE_SIZE),
-     _sort_constants(HASH_TABLE_SIZE)
+     _sort_constants(HASH_TABLE_SIZE),
+     _produce_proofs(false)
   {
     _sig = _exp_factory->get_signature();
     _sort_factory = _sig->get_sort_factory();
@@ -150,7 +152,17 @@ public:
 	return sc;										 
       }
   }
-    
+
+  bool produce_proofs() const
+  {
+    return _produce_proofs;
+  }
+
+  void set_produce_proofs(bool pp)
+  {
+    _produce_proofs = pp;
+  }
+  
   void cnf_transformation(const expression & expr, 
 			  std::vector<clause *> & clauses, 
 			  expression & name);

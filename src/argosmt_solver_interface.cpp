@@ -27,7 +27,9 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
   // Creating new solver instance and adding clauses to the solver
   expression_factory * factory = _smt_lib_api->get_expression_factory();
   _solver = new solver(factory, false);
+  _solver->set_produce_proofs(_smt_lib_api->produce_proofs());
 
+  
   for(unsigned i = 0; i < clauses.size(); i++)
     _solver->add_clause(clauses[i]);
   
@@ -257,6 +259,7 @@ check_sat_response argosmt_solver_interface::check_sat()
   std::vector<clause *> clauses;
 
   formula_transformer * ft = new formula_transformer(_smt_lib_api->get_expression_factory());
+  ft->set_produce_proofs(_smt_lib_api->produce_proofs());
   
   
   // CNF transformation

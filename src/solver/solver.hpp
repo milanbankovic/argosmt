@@ -288,6 +288,8 @@ private:
   unsigned _num_of_vars;
   bool _dimacs;
 
+  bool _produce_proofs;
+  
   formula_transformer * _formula_transformer;
   
   wall_clock _check_and_prop_time_spent;
@@ -348,6 +350,7 @@ public:
      _restart_strategy(nullptr),
      _num_of_vars(0),
      _dimacs(dimacs),
+     _produce_proofs(false),
      _formula_transformer(nullptr),
      _quantifier_instantiation_count_limit((unsigned)(-1)),
      _quantifier_instantiation_term_size_limit((unsigned)(-1)),
@@ -567,6 +570,16 @@ public:
   }
   
 
+  bool produce_proofs() const
+  {
+    return _produce_proofs;
+  }
+
+  void set_produce_proofs(bool pp)
+  {
+    _produce_proofs = pp;
+  }
+  
   // Initializes expression data for the literal e and its subexpressions 
   void init_expression_data(const expression & e);
 
