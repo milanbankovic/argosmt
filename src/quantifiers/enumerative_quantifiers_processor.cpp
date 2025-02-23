@@ -41,28 +41,38 @@ void enumerative_quantifiers_processor::check_quantifiers()
 	}
       else if(eb == EB_TRUE)
 	{
-	  // instantiate
-	  while(_insts[_curr_inst]._term_index < terms.size())
+	  if(_insts[_curr_inst]._sort == _solver.get_factory()->get_signature()->get_sort_factory()->BOOL_SORT())
 	    {
-	      expression term = terms[_insts[_curr_inst]._term_index++];
-	      sort s = term->get_inferred_sort();
-	      if(s != _insts[_curr_inst]._sort)
-		continue;
-	      
-	      expression_vector gterms = _insts[_curr_inst]._gterms;
-	      gterms.push_back(term);
-	      if(gterms.size() == _insts[_curr_inst]._qlit->get_quantified_variables().size())
+	      expression qlit =_insts[_curr_inst]._qlit;
+	      _solver.instantiate(qlit, { _solver.get_factory()->TRUE_EXPRESSION() });
+	      _solver.instantiate(qlit, { _solver.get_factory()->FALSE_EXPRESSION() });	      
+	    }
+	  else
+	    {
+	      // instantiate
+	      while(_insts[_curr_inst]._term_index < terms.size())
 		{
-		  _solver.instantiate(_insts[_curr_inst]._qlit, gterms);
-		  if(_solver.is_state_changed())
-		    break;
-		}
-	      else
-		{
-		  const sorted_variable & svar = _insts[_curr_inst]._qlit->get_quantified_variables()[gterms.size()];
-		  _insts.push_back(partial_inst { _insts[_curr_inst]._qlit, 0, std::move(gterms), false, svar.get_sort() });
-		  old_curr_inst = _curr_inst;
-		  break;
+		  expression term = terms[_insts[_curr_inst]._term_index++];
+		  sort s = term->get_inferred_sort();
+		  if(s != _insts[_curr_inst]._sort)
+		    continue;
+		  
+		  expression_vector gterms = _insts[_curr_inst]._gterms;
+		  gterms.push_back(term);
+		  if(gterms.size() == _insts[_curr_inst]._qlit->get_quantified_variables().size())
+		    {
+		      expression qlit = _insts[_curr_inst]._qlit;
+		      _solver.instantiate(qlit, gterms);
+		      if(_solver.is_state_changed())
+			break;
+		    }
+		  else
+		    {
+		      const sorted_variable & svar = _insts[_curr_inst]._qlit->get_quantified_variables()[gterms.size()];
+		      _insts.push_back(partial_inst { _insts[_curr_inst]._qlit, 0, std::move(gterms), false, svar.get_sort() });
+		      old_curr_inst = _curr_inst;
+		      break;
+		    }
 		}
 	    }
 	}	 	  
