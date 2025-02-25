@@ -346,8 +346,7 @@ public:
 
 namespace std {
     template<>
-    struct hash<special_constant> : 
-      public unary_function<special_constant, std::size_t> {
+    struct hash<special_constant> {
       std::size_t operator ()(const special_constant & c) const
       {
 	return c.hash_code();
@@ -519,8 +518,7 @@ public:
 
 namespace std {
     template<>
-    struct hash<symbol> : 
-      public unary_function<symbol, std::size_t> {
+    struct hash<symbol>  {
       std::size_t operator ()(const symbol & s) const
       {
 	return s.hash_code();
@@ -692,8 +690,7 @@ public:
 
 namespace std {    
     template<>
-    struct hash<keyword> : 
-      public unary_function<keyword, std::size_t> {
+    struct hash<keyword> {
       std::size_t operator ()(const keyword & k) const
       {
 	return k.hash_code();
@@ -1064,8 +1061,7 @@ const symbol & identifier::index::get_symbol_value() const
 
 namespace std {
     template<>
-    struct hash<identifier> : 
-      public unary_function<identifier, std::size_t> {
+    struct hash<identifier> {
       std::size_t operator ()(const identifier & id) const
       {
 	return id.hash_code();
@@ -1379,8 +1375,7 @@ public:
 
 namespace std {
     template<>
-    struct hash<attribute> : 
-      public unary_function<attribute, std::size_t> {
+    struct hash<attribute> {
       std::size_t operator ()(const attribute & attr) const
       {
 	return attr.get_keyword().hash_code();
@@ -1436,8 +1431,7 @@ public:
 
 namespace std {
     template<>
-    struct hash<sort_symbol> : 
-      public unary_function<sort_symbol, std::size_t> {
+    struct hash<sort_symbol> {
       std::size_t operator ()(const sort_symbol & s) const
       {
 	return s.hash_code();
@@ -1459,8 +1453,7 @@ public:
 
 namespace std {
     template<>
-    struct hash<sort_parameter> : 
-      public unary_function<sort_parameter, std::size_t> {
+    struct hash<sort_parameter> {
       std::size_t operator ()(const sort_parameter & p) const
       {
 	return p.hash_code();
@@ -1697,8 +1690,7 @@ public:
 
 namespace std {
     template<>
-    struct hash<function_symbol> : 
-      public unary_function<function_symbol, std::size_t> {
+    struct hash<function_symbol> {
       std::size_t operator ()(const function_symbol & s) const
       {
 	return s.hash_code();
@@ -1720,8 +1712,7 @@ public:
 
 namespace std {
     template<>
-    struct hash<variable> : 
-      public unary_function<variable, std::size_t> {
+    struct hash<variable> {
       std::size_t operator ()(const variable & v) const
       {
 	return v.hash_code();

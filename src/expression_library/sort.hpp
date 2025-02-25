@@ -276,8 +276,7 @@ public:
 namespace std {
   
     template<>
-    struct hash<sort_node*> :
-      public unary_function<sort_node *, std::size_t> {
+    struct hash<sort_node*> {
       std::size_t operator() (sort_node * s) const
       {
 	return s->hash_code();
@@ -286,9 +285,7 @@ namespace std {
     
   
   template<>
-  struct equal_to<sort_node*> :
-    public binary_function<sort_node *, 
-			   sort_node *, bool> {
+  struct equal_to<sort_node*> {
     bool operator () (sort_node * s, 
 		      sort_node * t) const
     {
@@ -297,8 +294,7 @@ namespace std {
   };
 
     template<>
-    struct hash< ::sort > :
-      public unary_function< ::sort, std::size_t > {
+    struct hash< ::sort > {
       std::size_t operator() (const ::sort & s) const
       {
 	return s->hash_code();

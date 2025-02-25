@@ -93,8 +93,7 @@ public:
 
 namespace std {
   template<>
-  struct hash<sorted_variable> : 
-    public unary_function<sorted_variable, std::size_t> {
+  struct hash<sorted_variable> {
     std::size_t operator ()(const sorted_variable & sv) const
     {
       return sv.hash_code();
@@ -164,8 +163,7 @@ public:
 
 namespace std {    
   template<>
-  struct hash<variable_binding> : 
-    public unary_function<variable_binding, std::size_t> {
+  struct hash<variable_binding> {
     std::size_t operator ()(const variable_binding & vb) const
     {
       return vb.hash_code();
@@ -641,8 +639,7 @@ public:
 namespace std {
 
   template<>
-  struct hash<expression_node*> :
-    public unary_function<expression_node *, std::size_t> {
+  struct hash<expression_node*> {
     std::size_t operator() (expression_node * s) const
     {
       return s->hash_code();
@@ -650,9 +647,7 @@ namespace std {
   };
     
   template<>
-  struct equal_to<expression_node*> :
-    public binary_function<expression_node *, 
-			   expression_node *, bool> {
+  struct equal_to<expression_node*> {
     bool operator () (expression_node * s, 
 		      expression_node * t) const
     {
@@ -661,8 +656,7 @@ namespace std {
   };
   
   template<>
-  struct hash<expression> :
-    public unary_function<expression, std::size_t> {
+  struct hash<expression> {
     std::size_t operator() (const expression & s) const
     {
       return s->hash_code();
