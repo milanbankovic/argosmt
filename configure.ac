@@ -1,8 +1,8 @@
 	#                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.68])
-AC_INIT([argosmt], [current], [milan@matf.bg.ac.rs])
+AC_PREREQ([2.71])
+AC_INIT([argosmt],[current],[milan@matf.bg.ac.rs])
 AC_CONFIG_SRCDIR([src/argosmt.cpp])
 AC_CONFIG_HEADERS([config.h])
 
@@ -17,8 +17,7 @@ AC_PROG_RANLIB
 
 # Clang++ use switch
 use_clang=no
-AC_ARG_ENABLE([clang++], [AC_HELP_STRING([--enable-clang++],
-    [build using clang++ instead of g++ (default NO)])],
+AC_ARG_ENABLE([clang++], [AS_HELP_STRING([--enable-clang++],[build using clang++ instead of g++ (default NO)])],
     [use_clang=$enableval])
 
 if test "x$use_clang" = "xyes" ; then
@@ -42,24 +41,20 @@ CXXFLAGS="-pedantic -Wall -std=c++17"
 
 # Choosing build mode (optimize vs debug vs profile)
 build_mode="optimize"
-AC_ARG_ENABLE([optimize], [AC_HELP_STRING([--enable-optimize],
-    [build with optimizations enabled (default YES);
+AC_ARG_ENABLE([optimize], [AS_HELP_STRING([--enable-optimize],[build with optimizations enabled (default YES);
         same as --enable-mode=optimize])],
     [test "x$enableval" = "xyes" && build_mode=optimize])
 
-AC_ARG_ENABLE([debug], [AC_HELP_STRING([--enable-debug],
-    [build with debugging information (default NO);
+AC_ARG_ENABLE([debug], [AS_HELP_STRING([--enable-debug],[build with debugging information (default NO);
         same as --enable-mode=debug])],
     [test "$enableval" = "yes" && build_mode=debug])
 
-AC_ARG_ENABLE([profile], [AC_HELP_STRING([--enable-profile],
-    [build with profiling enabled (default NO);
+AC_ARG_ENABLE([profile], [AS_HELP_STRING([--enable-profile],[build with profiling enabled (default NO);
         same as --enable-mode=profile])],
     [test "$enableval" = "yes" && build_mode=profile])
 
 
-AC_ARG_ENABLE([mode], [AC_HELP_STRING([--enable-mode],
-    [set build mode])],
+AC_ARG_ENABLE([mode], [AS_HELP_STRING([--enable-mode],[set build mode])],
     [if test "x$enableval" = "xdebug" ; then
        build_mode=debug
      elif test "x$enableval" = "xoptimize" ; then 
@@ -101,24 +96,19 @@ LIBS="-lgmp -lgmpxx -lrt"
 
 # Choosing value type for unknowns in arithmetics
 unknown_value_type=hybrid_long
-AC_ARG_ENABLE([gmp-values], [AC_HELP_STRING([--enable-gmp-values],
-    [use GMP values in arithmetic theory (default YES)])],
+AC_ARG_ENABLE([gmp-values], [AS_HELP_STRING([--enable-gmp-values],[use GMP values in arithmetic theory (default YES)])],
     [test "x$enableval" = "xyes" && unknown_value_type=gmp])
 
-AC_ARG_ENABLE([long-double-values], [AC_HELP_STRING([--enable-long-double-values],
-    [use long double values in arithmetic theory (default NO)])],
+AC_ARG_ENABLE([long-double-values], [AS_HELP_STRING([--enable-long-double-values],[use long double values in arithmetic theory (default NO)])],
     [test "x$enableval" = "xyes" && unknown_value_type=long_double])
 
-AC_ARG_ENABLE([long-int-values], [AC_HELP_STRING([--enable-long-int-values],
-    [use long int values in arithmetic theory (default NO)])],
+AC_ARG_ENABLE([long-int-values], [AS_HELP_STRING([--enable-long-int-values],[use long int values in arithmetic theory (default NO)])],
     [test "x$enableval" = "xyes" && unknown_value_type=long_int])
 
-AC_ARG_ENABLE([hybrid-int-values], [AC_HELP_STRING([--enable-hybrid-int-values],
-    [use hybrid int values in arithmetic theory (default NO)])],
+AC_ARG_ENABLE([hybrid-int-values], [AS_HELP_STRING([--enable-hybrid-int-values],[use hybrid int values in arithmetic theory (default NO)])],
     [test "x$enableval" = "xyes" && unknown_value_type=hybrid_int])
 
-AC_ARG_ENABLE([hybrid-long-values], [AC_HELP_STRING([--enable-hybrid-long-values],
-    [use hybrid long values in arithmetic theory (default NO)])],
+AC_ARG_ENABLE([hybrid-long-values], [AS_HELP_STRING([--enable-hybrid-long-values],[use hybrid long values in arithmetic theory (default NO)])],
     [test "x$enableval" = "xyes" && unknown_value_type=hybrid_long])
 
 
@@ -159,8 +149,7 @@ if test "x$unknown_value_type" = "xhybrid_long" ; then
 fi
 
 use_kat=no
-AC_ARG_ENABLE([katsirelos-alldiff-expl], [AC_HELP_STRING([--enable-katsirelos-alldiff-expl],
-    [build with Katsirelos' alldiff explanation enabled (default NO)])],
+AC_ARG_ENABLE([katsirelos-alldiff-expl], [AS_HELP_STRING([--enable-katsirelos-alldiff-expl],[build with Katsirelos' alldiff explanation enabled (default NO)])],
     [use_kat=$enableval])
 
 if test "x$use_kat" = "xyes" ; then
