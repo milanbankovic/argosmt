@@ -1,7 +1,7 @@
 	#                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.71])
+AC_PREREQ([1.16])
 AC_INIT([argosmt],[current],[milan@matf.bg.ac.rs])
 AC_CONFIG_SRCDIR([src/argosmt.cpp])
 AC_CONFIG_HEADERS([config.h])
