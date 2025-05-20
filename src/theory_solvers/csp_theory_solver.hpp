@@ -246,7 +246,10 @@ public:
 
     bool has_explanation_handler() const
     {
-      return _domain_restriction_data->_pair_data->_handler != 0;
+      if(_domain_restriction_data != 0)
+	return _domain_restriction_data->_pair_data->_handler != 0;
+      else
+	return _constraint_data->_pair_data->_explain_handler != 0;
     }
 
     void add_domain_restriction_value(int value)
@@ -263,14 +266,6 @@ public:
   };
 
 private:
-
-  struct on_pop {
-    csp_theory_solver * _theory;
-    on_pop(csp_theory_solver * th)
-      :_theory(th) {}
-
-    void operator () (const expression & e) const;
-  };
 
   data_extractor<csp_theory_solver_data> _data;
   expression_vector _constraints;

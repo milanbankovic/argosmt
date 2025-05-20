@@ -116,17 +116,6 @@ csp_theory_solver::csp_theory_solver_data::~csp_theory_solver_data()
     }
 }
 
-void csp_theory_solver::on_pop::operator () (const expression & e) const
-{
-  csp_theory_solver_data * e_data = _theory->_data.get_data(e);
-  if(e_data != 0 && e_data->has_constraint_data())
-    {
-      //std::cout << "Deactivating: " << e << std::endl;
-      e_data->get_constraint_handler()->set_active(false);
-    }
-}
-
-
 csp_theory_solver::csp_theory_solver_data * csp_theory_solver::add_variable(const expression & var)
 {
   assert(var->is_function());
@@ -318,7 +307,12 @@ void csp_theory_solver::backjump(unsigned level)
   _current_trail_pos = std::min(_solver.get_trail().size(), _current_trail_pos);
   _current_level = level;
   for(unsigned i = 0; i < _constraints.size(); i++)
-    _data.get_data(_constraints[i])->get_constraint_handler()->backjump(level);
+    {
+      csp_theory_solver_data * cons_data = _data.get_data(_constraints[i]);
+      cons_data->get_constraint_handler()->backjump(level);
+      if(_solver.get_trail().get_value(_constraints[i]) == EB_UNDEFINED)
+	cons_data->get_constraint_handler()->set_active(false);
+    }
   for(unsigned i = 0; i < _variables.size(); i++)
     _data.get_data(_variables[i])->get_variable_domain_handler()->backjump(level);
   _varorder->backjump(level);
