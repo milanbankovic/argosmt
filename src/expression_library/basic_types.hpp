@@ -891,8 +891,6 @@ private:
     void calculate_hash()
     {
       _hash_code = std::hash<std::string>() (_name);
-      if(!_indices->empty())
-	_hash_code += vector_hash_code<index>() (*_indices);
     }
 
     void out(std::ostream & ostr) const
