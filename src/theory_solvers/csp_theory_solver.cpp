@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "csp_theory_solver.hpp"
 #include "domain_handler.hpp"
 #include "alldiff_constraint_handler.hpp"
+#include "graph_lex_minimal_constraint_handler.hpp"
 #include "sum_constraint_handler.hpp"
 #include "csp_variable_order_strategy.hpp"
 #include "csp_value_order_strategy.hpp"
@@ -231,7 +232,7 @@ void csp_theory_solver::check_constraint_implications()
 }
 
 void csp_theory_solver::add_literal(const expression & l_pos, const expression & l_neg)
-{
+{  
   if(l_pos->is_equality() ||
      l_pos->get_symbol() == function_symbol::LE ||
      l_pos->get_symbol() == function_symbol::GE)
@@ -285,6 +286,20 @@ void csp_theory_solver::add_literal(const expression & l_pos, const expression &
 	  add_to_inactive_queue(l_pos_data->get_constraint_handler());
 	}
     }
+  else if(l_pos->get_symbol().get_name() == function_symbol::GRAPH_LEX_MIN.get_name())
+    {
+      //_solver.get_literal_selection_strategy()->branching_priority_hint(l_pos, 4);
+      _solver.get_polarity_selection_strategy()->preffered_polarity_hint(l_pos, 1, false);
+      _solver.get_literal_data(l_pos)->add_observing_theory_solver(this);
+      csp_theory_solver_data * l_pos_data = add_constraint_pair(l_pos, l_neg);
+      if(!l_pos_data->has_constraint_handler())
+	{
+	  l_pos_data->set_constraint_handler(new graph_lex_minimal_constraint_handler(this, l_pos, l_neg));
+	  check_constraint_implications();
+	  add_to_inactive_queue(l_pos_data->get_constraint_handler());
+	}
+    }
+  
 }
 
 void csp_theory_solver::new_level() 
@@ -550,11 +565,18 @@ expression csp_theory_solver::canonize_expression(const expression & e)
       std::sort(operands.begin(), operands.end());
       return _solver.get_factory()->create_expression(e->get_symbol(), std::move(operands));
     }
+  else if(e->get_symbol().get_name() == function_symbol::GRAPH_LEX_MIN.get_name() ||
+	  e->get_symbol().get_name() == function_symbol::NOT_GRAPH_LEX_MIN.get_name())
+    {
+      return e;
+    }
   else if(e->is_not())
     {
       expression ep = e->get_operands()[0];
       const function_symbol & ep_fs = ep->get_symbol();
-      if(ep_fs == function_symbol::ALLDIFF || ep_fs == function_symbol::NOT_ALLDIFF)
+      if(ep_fs == function_symbol::ALLDIFF || ep_fs == function_symbol::NOT_ALLDIFF ||
+	 ep_fs.get_name() == function_symbol::GRAPH_LEX_MIN.get_name() ||
+	 ep_fs.get_name() == function_symbol::NOT_GRAPH_LEX_MIN.get_name())
 	return _solver.get_factory()->create_expression(get_opposite_symbol(ep_fs), ep->get_operands());
       else
 	return arithmetic_canonizer<int>::canonize_expression(e);
@@ -576,6 +598,16 @@ void csp_theory_solver::get_literal_pair(const expression & l, expression & l_po
       l_neg = l;
       l_pos = _solver.get_factory()->create_expression(get_opposite_symbol(fs), l->get_operands());
     }
+  else if(fs.get_name() == function_symbol::GRAPH_LEX_MIN.get_name())
+    {
+      l_pos = l;
+      l_neg = _solver.get_factory()->create_expression(get_opposite_symbol(fs), l->get_operands());
+    }
+  else if(fs.get_name() == function_symbol::NOT_GRAPH_LEX_MIN.get_name())
+    {
+      l_neg = l;
+      l_pos = _solver.get_factory()->create_expression(get_opposite_symbol(fs), l->get_operands());
+    }  
   else
     arithmetic_canonizer<int>::get_literal_pair(l, l_pos, l_neg);
 }
@@ -625,6 +657,9 @@ void csp_theory_solver::print_report(std::ostream & ostr)
       ostr << "PERCENT OF IMPROVED BOUNDS: " << _sum_common_data._count_improved_bound_change / (double)_sum_common_data._count_bound_change << std::endl;
       ostr << "AVERAGE BOUND IMPROVEMENT: " << _sum_common_data._cumulative_improvement / (double)_sum_common_data._count_improved_bound_change << std::endl;
     }
+  ostr << "GRAPH_LEX_MINIMAL HANDLER: " << _graph_lex_minimal_common_data._count_propagate << " propagations and " <<
+    _graph_lex_minimal_common_data._count_conflict << " conflicts" << std::endl;
+  
 }
 
 csp_theory_solver::~csp_theory_solver()

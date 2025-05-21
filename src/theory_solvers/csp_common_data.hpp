@@ -87,4 +87,24 @@ struct bipartite_graph_common_data {
   {}
 };
 
+struct graph_lex_minimal_common_data {
+  unsigned _count_propagate;
+  unsigned _count_conflict;
+  unsigned _count_trivial_explain;
+  unsigned _count_hall_explain;
+  unsigned _expl_depth_count;
+  double _cumulative_expl_depth;
+  unsigned _instance_count;
+  graph_lex_minimal_common_data()
+    :_count_propagate(0),
+     _count_conflict(0),
+     _count_trivial_explain(0),
+     _count_hall_explain(0),
+     _expl_depth_count(0),
+     _cumulative_expl_depth(0.0),
+     _instance_count(0)
+  {}
+};
+
+
 #endif // _CSP_COMMON_DATA_H

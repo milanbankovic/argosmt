@@ -491,7 +491,7 @@ identifier::index_vector identifier::_dummy_index_vector = index_vector();
 
 bool identifier_weak_comparator::
 operator () (const identifier & id1, const identifier & id2) const
-{
+{  
   if(id1.get_name() != id2.get_name())
     return false;
     
@@ -649,6 +649,9 @@ const function_symbol function_symbol::BVSGE = function_symbol("bvsge");
 
 const function_symbol function_symbol::ALLDIFF =  function_symbol("alldiff");
 const function_symbol function_symbol::NOT_ALLDIFF = function_symbol("not_alldiff");
+
+const function_symbol function_symbol::GRAPH_LEX_MIN = function_symbol("graph_lex_minimal", { identifier::UNSPECIFIED_INDEX });
+const function_symbol function_symbol::NOT_GRAPH_LEX_MIN = function_symbol("not_graph_lex_minimal", { identifier::UNSPECIFIED_INDEX });
 
 const variable variable::UNDEFINED = variable("");
 const variable_vector EMPTY_VARIABLE_VECTOR = variable_vector();

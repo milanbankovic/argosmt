@@ -891,8 +891,6 @@ private:
     void calculate_hash()
     {
       _hash_code = std::hash<std::string>() (_name);
-      if(!_indices->empty())
-	_hash_code += vector_hash_code<index>() (*_indices);
     }
 
     void out(std::ostream & ostr) const
@@ -1676,6 +1674,12 @@ public:
   /** not_alldiff function symbol. */
   static const function_symbol NOT_ALLDIFF;
 
+  /** (_ graph_lex_minimal n) function symbol. */
+  static const function_symbol GRAPH_LEX_MIN;
+
+  /** (_ not_graph_lex_minimal n) function symbol. */
+  static const function_symbol NOT_GRAPH_LEX_MIN;
+  
 
   using identifier::identifier;
   

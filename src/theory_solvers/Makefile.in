@@ -111,7 +111,8 @@ am_libtheorysolvers_a_OBJECTS = clause_theory_solver.$(OBJEXT) \
 	euf_theory_solver.$(OBJEXT) arithmetic_theory_solver.$(OBJEXT) \
 	csp_theory_solver.$(OBJEXT) domain_handler.$(OBJEXT) \
 	alldiff_constraint_handler.$(OBJEXT) bipartite_graph.$(OBJEXT) \
-	sum_constraint_handler.$(OBJEXT)
+	sum_constraint_handler.$(OBJEXT) \
+	graph_lex_minimal_constraint_handler.$(OBJEXT)
 libtheorysolvers_a_OBJECTS = $(am_libtheorysolvers_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -134,6 +135,7 @@ am__depfiles_remade = ./$(DEPDIR)/alldiff_constraint_handler.Po \
 	./$(DEPDIR)/clause_theory_solver.Po \
 	./$(DEPDIR)/csp_theory_solver.Po ./$(DEPDIR)/domain_handler.Po \
 	./$(DEPDIR)/euf_theory_solver.Po \
+	./$(DEPDIR)/graph_lex_minimal_constraint_handler.Po \
 	./$(DEPDIR)/sum_constraint_handler.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
@@ -285,7 +287,8 @@ libtheorysolvers_a_SOURCES = clause_theory_solver.cpp \
 	                domain_handler.cpp \
 		        alldiff_constraint_handler.cpp \
 	                bipartite_graph.cpp \
-	                sum_constraint_handler.cpp
+	                sum_constraint_handler.cpp \
+	                graph_lex_minimal_constraint_handler.cpp
 
 noinst_HEADERS = theory_solver.hpp \
 		 clause_theory_solver.hpp \
@@ -308,7 +311,8 @@ noinst_HEADERS = theory_solver.hpp \
 	         most_preferred_csp_value_order_strategy.hpp \
 	         csp_explanation_minimizer.hpp \
 		 csp_common_data.hpp \
-		 hybrid_types.hpp
+		 hybrid_types.hpp \
+	         graph_lex_minimal_constraint_handler.hpp
 
 all: all-am
 
@@ -365,6 +369,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/csp_theory_solver.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/domain_handler.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/euf_theory_solver.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/graph_lex_minimal_constraint_handler.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sum_constraint_handler.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
@@ -518,6 +523,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/csp_theory_solver.Po
 	-rm -f ./$(DEPDIR)/domain_handler.Po
 	-rm -f ./$(DEPDIR)/euf_theory_solver.Po
+	-rm -f ./$(DEPDIR)/graph_lex_minimal_constraint_handler.Po
 	-rm -f ./$(DEPDIR)/sum_constraint_handler.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
@@ -571,6 +577,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/csp_theory_solver.Po
 	-rm -f ./$(DEPDIR)/domain_handler.Po
 	-rm -f ./$(DEPDIR)/euf_theory_solver.Po
+	-rm -f ./$(DEPDIR)/graph_lex_minimal_constraint_handler.Po
 	-rm -f ./$(DEPDIR)/sum_constraint_handler.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic

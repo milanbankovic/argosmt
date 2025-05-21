@@ -15,7 +15,8 @@ libtheorysolvers_a_SOURCES = clause_theory_solver.cpp \
 	                domain_handler.cpp \
 		        alldiff_constraint_handler.cpp \
 	                bipartite_graph.cpp \
-	                sum_constraint_handler.cpp
+	                sum_constraint_handler.cpp \
+	                graph_lex_minimal_constraint_handler.cpp
 
 noinst_HEADERS = theory_solver.hpp \
 		 clause_theory_solver.hpp \
@@ -38,6 +39,7 @@ noinst_HEADERS = theory_solver.hpp \
 	         most_preferred_csp_value_order_strategy.hpp \
 	         csp_explanation_minimizer.hpp \
 		 csp_common_data.hpp \
-		 hybrid_types.hpp
+		 hybrid_types.hpp \
+	         graph_lex_minimal_constraint_handler.hpp
 
 AM_CXXFLAGS += -Wall

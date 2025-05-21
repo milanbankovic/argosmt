@@ -302,13 +302,23 @@ private:
     return !is_coefficient(e);
   }
 
-  const function_symbol & get_opposite_symbol(const function_symbol & fs)
+  const function_symbol get_opposite_symbol(const function_symbol & fs)
   {
     if(fs == function_symbol::ALLDIFF)
       return function_symbol::NOT_ALLDIFF;
     if(fs == function_symbol::NOT_ALLDIFF)
       return function_symbol::ALLDIFF;
 
+    if(fs.get_name() == function_symbol::GRAPH_LEX_MIN.get_name())
+      {
+	return function_symbol(function_symbol::NOT_GRAPH_LEX_MIN.get_name(), fs.get_indices());
+      }
+
+    if(fs.get_name() == function_symbol::NOT_GRAPH_LEX_MIN.get_name())
+      {
+	return function_symbol(function_symbol::GRAPH_LEX_MIN.get_name(), fs.get_indices());
+      }
+    
     return arithmetic_canonizer<int>::get_opposite_symbol(fs);
   }
 
@@ -344,7 +354,8 @@ public:
   alldiff_common_data _alldiff_common_data;
   sum_common_data _sum_common_data;
   bipartite_graph_common_data _bipartite_graph_common_data;
-
+  graph_lex_minimal_common_data _graph_lex_minimal_common_data;
+  
 public:
   csp_theory_solver(solver & sl, alldiff_sum_algorithm as_alg = AS_NONE,
 	     bool predefined_bounds = false, int lower = 0, int upper = -1)
@@ -429,6 +440,8 @@ public:
   {
     return e->get_symbol() == function_symbol::ALLDIFF || 
       e->get_symbol() == function_symbol::NOT_ALLDIFF ||
+      e->get_symbol().get_name() == function_symbol::GRAPH_LEX_MIN.get_name() ||
+      e->get_symbol().get_name() == function_symbol::NOT_GRAPH_LEX_MIN.get_name() ||
       (e->is_constant_function() && e->get_inferred_sort()->get_symbol() == sort_symbol::REAL) ||
       (e->is_constant_function() && e->get_inferred_sort()->get_symbol() == sort_symbol::INT) ||
       (e->is_numeral_constant() || e->is_decimal_constant() || is_arithmetic(e));

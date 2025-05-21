@@ -284,7 +284,7 @@ reals_ints_theory_declaration::create_signature(signature * logic_signature)
 }
 
 class csp_symbol_checker : public function_symbol_checker {
-private:
+protected:
   signature * _signature;
 public:
   csp_symbol_checker(signature * sig)
@@ -322,6 +322,37 @@ public:
   }
 };
 
+class csp_indexed_symbol_checker : public csp_symbol_checker {
+
+public:
+  using csp_symbol_checker::csp_symbol_checker;
+
+  virtual bool check_symbol(const function_symbol & symbol,
+			    const sort_vector & operand_sorts,
+			    sort & return_sort)
+  {
+    if(!csp_symbol_checker::check_symbol(symbol, operand_sorts, return_sort))
+      return false;
+
+    if(!symbol.has_indices())
+      return false;
+    
+    const identifier::index_vector & indices = symbol.get_indices();
+
+    if(indices.size() != 1)
+      return false;
+
+    unsigned index = indices[0].get_unsigned_value();
+    unsigned num_vars = index * (index - 1) / 2;
+    if(operand_sorts.size() != num_vars)
+      return false;
+    
+    return true;
+  }
+  
+};
+
+
 signature * 
 constraints_theory_declaration::create_signature(signature * logic_signature)
 {
@@ -329,6 +360,8 @@ constraints_theory_declaration::create_signature(signature * logic_signature)
     
   sig->add_function_symbol_checker(function_symbol::ALLDIFF, new csp_symbol_checker(sig));
   sig->add_function_symbol_checker(function_symbol::NOT_ALLDIFF, new csp_symbol_checker(sig));
+  sig->add_function_symbol_checker(function_symbol::GRAPH_LEX_MIN, new csp_indexed_symbol_checker(sig));
+  sig->add_function_symbol_checker(function_symbol::NOT_GRAPH_LEX_MIN, new csp_indexed_symbol_checker(sig));
   return sig;
 }
 
