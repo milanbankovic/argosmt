@@ -26,6 +26,9 @@ std::ifstream cmd_line_parser::_input_file;
 std::ofstream cmd_line_parser::_model_out;
 std::istream * cmd_line_parser::_input = &std::cin;
 std::ifstream cmd_line_parser::_config_file;
+bool cmd_line_parser::_print_reports = false;
+bool cmd_line_parser::_print_statistics = false;
+bool cmd_line_parser::_print_progress = false;
 
 #include "config.h"
 
@@ -104,6 +107,18 @@ void cmd_line_parser::parse_cmd_line(int argc, char ** argv)
 	  solver_configuration::print_option_list(std::cerr);
 	  exit(1);
 	}
+      else if(std::string("-r") == argv[i] || std::string("--print-reports") == argv[i])
+	{
+	  _print_reports = true;
+	}
+      else if(std::string("-s") == argv[i] || std::string("--print-statistics") == argv[i])
+	{
+	  _print_statistics = true;
+	}      
+      else if(std::string("-p") == argv[i] || std::string("--print-progress") == argv[i])
+	{
+	  _print_progress = true;
+	}      
       else if(_input == &std::cin)
 	{
 	  _input_file.open(argv[i]);

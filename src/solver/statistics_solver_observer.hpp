@@ -86,14 +86,14 @@ public:
 				  const expression & l_opp)
   {
     ++_count_literal_introduce;
-    if(_count_literal_introduce % _period == 0)
+    if(_period != 0 && _count_literal_introduce % _period == 0)
       _ostr << "i" << std::flush;
   }
 
   virtual void decide_applied(const expression & l)
   {
     ++_count_decide;
-    if(_count_decide % _period == 0)
+    if(_period != 0 && _count_decide % _period == 0)
       _ostr << "d" << std::flush;
     ++_current_level;    
   }
@@ -102,7 +102,7 @@ public:
 				const theory_solver * source_ts)
   {
     ++_count_propagate;
-    if(_count_propagate % (_period * 100) == 0)
+    if(_period != 0 && _count_propagate % (_period * 100) == 0)
       _ostr << "p" << std::flush;
 
     if(!_inited)
@@ -140,10 +140,11 @@ public:
     if(level == 0)
       {
 	++_count_backjump_to_zero;
-	_ostr << "z" << std::flush;
+	if(_period != 0)
+	  _ostr << "z" << std::flush;
       }
 
-    if(_count_backjump % _period == 0)
+    if(_period != 0 && _count_backjump % _period == 0)
       _ostr << "b" << std::flush;
     _cum_bckjmp_distance += _current_level - level;
     _cum_bckjmp_cl_size += cl->size();
@@ -154,14 +155,15 @@ public:
 			      unsigned number_of_clauses)
   {
     ++_count_forget;
-    if(_count_forget % _period == 0)
+    if(_period != 0 && _count_forget % _period == 0)
       _ostr << "f" << std::flush;
   }
   
   virtual void restart_applied()
   {
     ++_count_restart;
-    _ostr << "r" << std::endl;
+    if(_period != 0)
+      _ostr << "r" << std::endl;
     //report();
   }
   

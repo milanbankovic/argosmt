@@ -32,6 +32,9 @@ private:
   static std::ofstream _model_out;
   static std::istream * _input;
   static std::ifstream _config_file;
+  static bool _print_reports;
+  static bool _print_statistics;
+  static bool _print_progress;
   
   static void print_usage_message(const char * prg_name)
   {
@@ -45,6 +48,9 @@ private:
       "\n\t'-d <num>'  (or '--decide-limit <num>')"
       "\n\t'-c <file>' (or '--config <file>')"
       "\n\t'-l' (or '--list-config-options')"
+      "\n\t'-r' (or '--print-reports')"
+      "\n\t'-s' (or '--print-statistics')"
+      "\n\t'-p' (or '--print-progress')"
 	      << std::endl;
   }
 public:
@@ -88,6 +94,22 @@ public:
   {
     _config_file.close();
   }
+
+  static bool print_reports()
+  {
+    return _print_reports;
+  }
+
+  static bool print_statistics()
+  {
+    return _print_statistics;
+  }
+  
+  static bool print_progress()
+  {
+    return _print_progress;
+  }
+  
 };
 
 #endif // _CMD_LINE_PARSER_H

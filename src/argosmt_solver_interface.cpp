@@ -34,7 +34,7 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
     _solver->add_clause(clauses[i]);
   
   _solver->set_formula_transformer(ft);
-  _solver->add_observer(_stat = new statistics_solver_observer(*_solver, std::cout, 10000));
+  _solver->add_observer(_stat = new statistics_solver_observer(*_solver, std::cerr, cmd_line_parser::print_progress() ? 10000 : 0));
   //_solver->add_observer(new logging_solver_observer(*_solver, std::cout));
   //_solver->add_observer(new logging_solver_observer(*_solver, std::cerr));
 
@@ -269,13 +269,21 @@ check_sat_response argosmt_solver_interface::check_sat()
     }
 
   check_sat_response csr = start_solver(clauses, ft);
-  _stat->report();
-  _stat->all_theories_report();
+
+  if(cmd_line_parser::print_progress())
+    std::cerr << std::endl;
+  
+  if(cmd_line_parser::print_reports())
+    {
+        _stat->report();
+	_stat->all_theories_report();
+    }
   
   // write :all-statistics info
   attribute_set attr;
   _stat->get_statistics(attr);
-    
+
+  
   double elapsed = _cl.seconds_elapsed();
     
   attr.insert(attribute(":solving-time", elapsed));
