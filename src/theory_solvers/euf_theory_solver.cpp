@@ -742,15 +742,45 @@ void euf_theory_solver::check_and_propagate(unsigned layer)
     {
       expression l_pos = _new_literals[i];
       expression l_neg = _new_literals[i+1];
-
+      
       register_expression(l_pos);
       register_expression(l_neg);
+      
+      if(l_pos->is_equality())
+	{	 
+	  expression left = l_pos->get_operands()[0];
+	  expression right = l_pos->get_operands()[1];
 
-      if(_data.get_data(l_pos)->is_relevant() && l_pos->is_equality() && l_pos->get_operands()[0] == l_pos->get_operands()[1])
-	{
-	  _trivial_propagations.push_back(l_pos);
-	  apply_trivial_propagation(l_pos);
-	}
+	  if(left == right)
+	    {
+	      _trivial_propagations.push_back(l_pos);
+	      apply_trivial_propagation(l_pos);
+	    }
+	  else
+	    {
+	      // NEW: ADD ACKERMANN'S CLAUSES FOR ARITY <= 2
+	      const expression_vector & left_ops = left->get_operands();
+	      const expression_vector & right_ops = right->get_operands();
+	      if(left->get_symbol() == right->get_symbol() && left_ops.size() == right_ops.size() && left_ops.size() <= 2)
+		{
+		  clause * cl = new clause();
+		  for(unsigned i = 0; i < left_ops.size(); i++)
+		    {
+		      expression li = left_ops[i];
+		      expression ri = right_ops[i];
+		      expression eqi = _solver.get_factory()->create_expression(function_symbol::EQ, li, ri);
+		      
+		      _solver.apply_introduce_literal(eqi);
+		      expression neqi = _solver.get_literal_data(eqi)->get_opposite();
+		      cl->push_back(neqi);
+		    }
+		  cl->push_back(l_pos);
+		  //std::cout << "ACKERMAN: " << *cl << std::endl;
+		  _solver.apply_theory_lemma(cl);
+		}
+	      
+	    }
+	} 
     }
   _new_literals.clear();
 
