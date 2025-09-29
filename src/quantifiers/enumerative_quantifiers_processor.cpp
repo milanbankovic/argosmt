@@ -25,7 +25,7 @@ void enumerative_quantifiers_processor::check_quantifiers()
     return;
   
   unsigned old_curr_inst = _curr_inst;
-  const expression_vector & terms = _solver.get_congruence_closure_theory_solver()->get_all_terms();
+
   do
     {
       extended_boolean eb = _solver.get_trail().get_value(_insts[_curr_inst]._qlit);
@@ -41,40 +41,35 @@ void enumerative_quantifiers_processor::check_quantifiers()
 	}
       else if(eb == EB_TRUE)
 	{
-	  if(_insts[_curr_inst]._sort == _solver.get_factory()->get_signature()->get_sort_factory()->BOOL_SORT())
+	  sort bool_sort = _solver.get_factory()->get_signature()->get_sort_factory()->BOOL_SORT();
+	  expression_vector bool_terms = { _solver.get_factory()->FALSE_EXPRESSION(), _solver.get_factory()->TRUE_EXPRESSION() };
+	  const expression_vector & terms = _insts[_curr_inst]._sort == bool_sort ?  bool_terms : _solver.get_congruence_closure_theory_solver()->get_all_terms();
+	  
+	  // instantiate
+	  while(_insts[_curr_inst]._term_index < terms.size())
 	    {
-	      expression qlit =_insts[_curr_inst]._qlit;
-	      _solver.instantiate(qlit, { _solver.get_factory()->TRUE_EXPRESSION() });
-	      _solver.instantiate(qlit, { _solver.get_factory()->FALSE_EXPRESSION() });	      
-	    }
-	  else
-	    {
-	      // instantiate
-	      while(_insts[_curr_inst]._term_index < terms.size())
+	      expression term = terms[_insts[_curr_inst]._term_index++];
+	      sort s = term->get_inferred_sort();
+	      if(s != _insts[_curr_inst]._sort)
+		continue;
+	      
+	      expression_vector gterms = _insts[_curr_inst]._gterms;
+	      gterms.push_back(term);
+	      if(gterms.size() == _insts[_curr_inst]._qlit->get_quantified_variables().size())
 		{
-		  expression term = terms[_insts[_curr_inst]._term_index++];
-		  sort s = term->get_inferred_sort();
-		  if(s != _insts[_curr_inst]._sort)
-		    continue;
-		  
-		  expression_vector gterms = _insts[_curr_inst]._gterms;
-		  gterms.push_back(term);
-		  if(gterms.size() == _insts[_curr_inst]._qlit->get_quantified_variables().size())
-		    {
-		      expression qlit = _insts[_curr_inst]._qlit;
-		      _solver.instantiate(qlit, gterms);
-		      if(_solver.is_state_changed())
-			break;
-		    }
-		  else
-		    {
-		      const sorted_variable & svar = _insts[_curr_inst]._qlit->get_quantified_variables()[gterms.size()];
-		      _insts.push_back(partial_inst { _insts[_curr_inst]._qlit, 0, std::move(gterms), false, svar.get_sort() });
-		      old_curr_inst = _curr_inst;
-		      break;
-		    }
+		  expression qlit = _insts[_curr_inst]._qlit;
+		  _solver.instantiate(qlit, gterms);
+		  if(_solver.is_state_changed())
+		    break;
 		}
-	    }
+	      else
+		{
+		  const sorted_variable & svar = _insts[_curr_inst]._qlit->get_quantified_variables()[gterms.size()];
+		  _insts.push_back(partial_inst { _insts[_curr_inst]._qlit, 0, std::move(gterms), false, svar.get_sort() });
+		  old_curr_inst = _curr_inst;
+		  break;
+		}
+	    }	  
 	}	 	  
       _curr_inst = (_curr_inst + 1) % _insts.size();     
     } while(!_solver.is_state_changed() && _curr_inst != old_curr_inst);
