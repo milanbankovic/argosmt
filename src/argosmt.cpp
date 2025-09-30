@@ -54,9 +54,6 @@ int main(int argc, char ** argv)
 	  std::cerr << std::endl;
 	}
     }
-
-  if(cmd_line_parser::print_reports())
-    sl.print_reports(std::cerr);
   
   return 0;
 }

@@ -247,7 +247,7 @@ check_sat_response argosmt_solver_interface::start_solver(const std::vector<clau
     {
       std::cerr << "VERIFICATION OF ASSIGNMENT FAILED!!" << std::endl;
     }
-       
+
   return csr;
 }
 
@@ -277,6 +277,7 @@ check_sat_response argosmt_solver_interface::check_sat()
     {
         _stat->report();
 	_stat->all_theories_report();
+	print_reports(std::cerr);
     }
   
   // write :all-statistics info
