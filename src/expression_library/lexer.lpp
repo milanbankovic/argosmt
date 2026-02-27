@@ -68,9 +68,6 @@ keyword     :({nd}|[0-9])+
 #b[01]+                             yylval.str_attr = new std::string(yytext); return BINARY;
 \"([^\"]|\"\")*\"                   yylval.str_attr = new std::string(yytext); return STRING_LITERAL;
 par                                 return RW_PAR;
-NUMERAL                             return RW_NUMERAL;
-DECIMAL                             return RW_DECIMAL;
-STRING                              return RW_STRING;
 _                                   return RW_UNDERSCORE;
 !                                   return RW_EXCLAMATION;
 as                                  return RW_AS;

@@ -35,6 +35,7 @@ private:
   static bool _print_reports;
   static bool _print_statistics;
   static bool _print_progress;
+  static bool _print_log;
   
   static void print_usage_message(const char * prg_name)
   {
@@ -51,6 +52,7 @@ private:
       "\n\t'-r' (or '--print-reports')"
       "\n\t'-s' (or '--print-statistics')"
       "\n\t'-p' (or '--print-progress')"
+      "\n\t'-g' (or '--print-log')"
 	      << std::endl;
   }
 public:
@@ -108,6 +110,11 @@ public:
   static bool print_progress()
   {
     return _print_progress;
+  }
+
+  static bool print_log()
+  {
+    return _print_log;
   }
   
 };

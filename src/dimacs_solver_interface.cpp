@@ -49,6 +49,8 @@ void dimacs_solver_interface::read_dimacs(std::istream & istr, std::vector<claus
       istr >> n; 
       while(!istr.eof() && !istr.fail() && n != 0)
 	{
+	  
+	  
 	  sat_variable variable = n > 0 ? n : -n;
 	  sat_literal_polarity polarity = n > 0 ? SLP_POSITIVE : SLP_NEGATIVE;
 	  expression literal = 
@@ -59,10 +61,18 @@ void dimacs_solver_interface::read_dimacs(std::istream & istr, std::vector<claus
 	  istr >> n;
 	}
       
-      if(istr.eof() || istr.fail())
+      if(istr.fail())
 	throw "Bad input";
 
       clauses.push_back(c);
+      
+      if(istr.eof())
+	{
+	  if(clauses.size() < num_of_clauses)
+	    throw "Insufficient number of clauses provided";
+	  else
+	    break;
+	}     
     }
 }
 
@@ -81,16 +91,20 @@ check_sat_response dimacs_solver_interface::start_solver(const std::vector<claus
   //_solver->set_literal_selection_strategy(new interactive_literal_selection_strategy(*_solver));
   //_solver->set_polarity_selection_strategy(new interactive_polarity_selection_strategy(*_solver));
   //_solver->set_forget_strategy(new never_forget_strategy());
-  //_solver->add_observer(new logging_solver_observer(*_solver, std::cout));
-  //_solver->add_observer(new logging_solver_observer(*_solver, std::cerr));
 
-std::mt19937 decide_rng(s_config.random_seed());
+  if(cmd_line_parser::print_log())
+    {
+      //_solver->add_observer(new logging_solver_observer(*_solver, std::cout));
+      _solver->add_observer(new logging_solver_observer(*_solver, std::cerr));
+    }
   
-if(s_config.randomize_decide())
-  {
+  std::mt19937 decide_rng(s_config.random_seed());
+  
+  if(s_config.randomize_decide())
+    {
       double r = s_config.random_decides_percent();
       unsigned d = s_config.random_decides_after_restart();
-
+      
       _solver->set_literal_selection_strategy(new random_decorater_literal_selection_strategy<>
 					      (*_solver, 
 					       new vsids_literal_selection_strategy(*_solver), decide_rng, r, d));
@@ -104,7 +118,7 @@ if(s_config.randomize_decide())
   _solver->set_forget_strategy(new geometric_forget_strategy(*_solver));
   _solver->set_forget_selection_strategy(new clause_activity_forget_selection_strategy(*_solver));
   _solver->set_restart_strategy(new conflict_counting_restart_strategy(*_solver,100, 1.5));
-  _solver->add_observer(_stat = new statistics_solver_observer(*_solver, std::cout, 10000));
+  _solver->add_observer(_stat = new statistics_solver_observer(*_solver, std::cerr, cmd_line_parser::print_progress() ? 10000 : 0));
   _solver->add_theory_solver(new clause_theory_solver(*_solver));
   return _solver->solve();  
 }
@@ -146,9 +160,14 @@ void dimacs_solver_interface::check_sat()
       std::cout << "UNKNOWN" << std::endl;
     }
   
-  _stat->report();
-  _stat->all_theories_report();  
-  std::cout << "Trail final size: " << _solver->get_trail().size() << std::endl;
-  double elapsed = _cl.seconds_elapsed();
-  std::cout << "Total time: " << elapsed << std::endl;
+  if(cmd_line_parser::print_reports())
+    {
+      _stat->report();
+      _stat->all_theories_report();
+      if(_solver != nullptr)
+	_solver->print_reports(std::cerr);
+      std::cerr << "Trail final size: " << _solver->get_trail().size() << std::endl;
+      double elapsed = _cl.seconds_elapsed();
+      std::cerr << "Total time: " << elapsed << std::endl;
+    }
 }

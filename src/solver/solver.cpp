@@ -153,6 +153,8 @@ void solver::clear_expression_data(const expression & e)
 
 void solver::introduce_literal_without_sending(expression & l)
 {
+  //std::cout << "Literal: " << l << std::endl;
+  
   expression l_pos;
   expression l_neg;
 
@@ -675,7 +677,7 @@ void solver::skolemize(const expression & l)
   if(ldata->is_skolemized())
     return;
   
-  // std::cout << "SKOLEMIZING: " << l << std::endl;
+  //std::cerr << "SKOLEMIZING: " << l << std::endl;
   
   // create unique constants c1,...,cn
   const sorted_variable_vector & svars = l->get_quantified_variables();  
@@ -686,7 +688,7 @@ void solver::skolemize(const expression & l)
     }
   expression f = l->get_subexpression()->get_instance(sub);
 
-  //  std::cout << "OBTAINED: " << f << std::endl;
+  //std::cerr << "OBTAINED: " << f << std::endl;
 
   ldata->set_skolemized(true);
   
@@ -753,11 +755,11 @@ void solver::instantiate(const expression & l, const expression_vector & gterms)
   if(ldata->is_instantiated(f))
     return;
   
-  /*  std::cout << "INSTANTIATING: " << l << " with: ";
+  /*   std::cerr << "INSTANTIATING: " << l << " with: ";
   for(const auto & t : gterms)
-    std::cout << t << " , ";
-  std::cout << std::endl;
-  std::cout << "OBTAINED: " << f << std::endl;
+   std::cerr << t << " , ";
+  std::cerr << std::endl;
+  std::cerr << "OBTAINED: " << f << std::endl;
   */
 
   

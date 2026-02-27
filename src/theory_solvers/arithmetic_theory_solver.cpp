@@ -131,13 +131,9 @@ void arithmetic_theory_solver::shuffle_unknowns()
   _basic_unknowns.clear();
   _non_basic_unknowns.clear();
   _inactive_unknowns.clear();
-  std::random_shuffle(_all_unknowns.begin(),
-		      _all_unknowns.end(),
-		      [this] (unsigned n)
-		      {
-			std::uniform_int_distribution<unsigned> int_dist(0, n - 1);
-			return int_dist(_rng);
-		      }); 
+  std::shuffle(_all_unknowns.begin(),
+	       _all_unknowns.end(), _rng);
+
   for(unsigned i = 0; i < _all_unknowns.size(); i++)
     {
       arithmetic_theory_solver_data * u_data = _data.get_data(_all_unknowns[i]);
@@ -251,14 +247,14 @@ void arithmetic_theory_solver::init_unknown(const expression & unknown)
 {
   if(_data.has_data(unknown))
     return;
-
+  
   bool is_integer = (unknown->get_inferred_sort()->get_symbol() == sort_symbol::INT);
   if(is_integer && is_atom(unknown))
     {
       _integer_unknowns.push_back(unknown);
-      //      std::cout << "Integer unknown: " << unknown << std::endl;
+      //std::cout << "Integer unknown: " << unknown << std::endl;
     }
-
+  
   arithmetic_theory_solver_data * u_data = new arithmetic_theory_solver_data(_current_level, _all_unknowns.size(), is_integer);
   linear_polynomial & lp = u_data->row();
   _data.set_data(unknown, u_data);
@@ -385,7 +381,7 @@ void arithmetic_theory_solver::add_literal(const expression & l, const expressio
   value_pair rp(c, 0);
   arithmetic_theory_solver_data * u_data = _data.get_data(unknown);
   if(u_data->is_integer() && (bt == B_UPPER || bt == B_LOWER))
-    {
+    {      
       tighten_integer_bound(rp, bt);
     }
   arithmetic_theory_solver_data * l_data = new arithmetic_theory_solver_data(unknown, std::move(rp), bt);
@@ -483,7 +479,7 @@ void arithmetic_theory_solver::process_assertion(const expression & l)
   arithmetic_theory_solver_data * l_data = _data.get_data(l);
   if(l_data->has_constraint_data())
     {
-      //      std::cout << "PROCESSING ASSERTION: " << l << std::endl;
+      //std::cout << "PROCESSING ASSERTION: " << l << std::endl;
 
       switch(l_data->get_constraint().type)
 	{
@@ -767,9 +763,9 @@ void arithmetic_theory_solver::check_and_propagate(unsigned layer)
 {
   if(layer >= _num_of_layers)
     return;
-  
-  _check_and_prop_time_spent.start();
 
+  _check_and_prop_time_spent.start();
+  
   if(layer > 0)
     _check_count++;
 
@@ -791,6 +787,7 @@ void arithmetic_theory_solver::check_and_propagate(unsigned layer)
     }
 
   process_assertions();
+  
   if(!_solver.is_conflict() && (_solver.all_literals_assigned() || (layer >= 1 && _check_count >= _check_period)))
     {
       do {
@@ -857,14 +854,17 @@ void arithmetic_theory_solver::get_literal_pair(const expression & l, expression
 
 void arithmetic_theory_solver::get_model(const expression_vector & exps)
 {
-  calculate_delta(); 
+  calculate_delta();
+  
   for(unsigned i = 0; i < exps.size(); i++)
-    {
-      if(!_data.has_data(exps[i]) || !_data.get_data(exps[i])->has_unknown_data())
+    {      
+      if(exps[i]->get_expression_data() == nullptr ||
+	 !_data.has_data(exps[i]) ||
+	 !_data.get_data(exps[i])->has_unknown_data())
 	continue;
 
       //std::cout << "VALUE: " << exps[i] << " : " << get_valuation(exps[i]) << std::endl;
-
+      
       exps[i]->set_assigned(get_expr_from_value(get_valuation(exps[i])));
     }
 }
@@ -1523,7 +1523,7 @@ void arithmetic_theory_solver::propagate_weaker_constraints(const expression & u
 	    }
 	  else if(cstsi_value == EB_FALSE)
 	    {
-	      //	      std::cout << "CONS: " << csts[i] << std::endl;
+	      //std::cout << "CONS: " << csts[i] << std::endl;
 	      generate_propagation_explanation(csts[i], c, expl);
 	      expl.push_back(_solver.get_literal_data(csts[i])->get_opposite());
 	      _solver.apply_conflict(expl, this);
@@ -2172,7 +2172,7 @@ void arithmetic_theory_solver::print_tableau()
   for(unsigned i = 0; i < _all_unknowns.size(); i++)
     {
       arithmetic_theory_solver_data * th_data = _data.get_data(_all_unknowns[i]);
-      std::cout << "Unknown: " << _all_unknowns[i] << " : " << th_data->get_valuation() << " : [" << th_data->get_lower_bound() << " - " << th_data->get_upper_bound() << (_inactive_unknowns.find(_all_unknowns[i]) != _inactive_unknowns.end() ? " (INACTIVE)" : "") << std::endl;
+      std::cout << "Unknown: " << _all_unknowns[i] << " : " << th_data->get_valuation() << " : [" << th_data->get_lower_bound() << " - " << th_data->get_upper_bound() << "]" << (_inactive_unknowns.find(_all_unknowns[i]) != _inactive_unknowns.end() ? " (INACTIVE)" : "") << std::endl;
     }
 
 

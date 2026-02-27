@@ -60,43 +60,40 @@ extern int yydebug;
     BINARY = 261,                  /* BINARY  */
     STRING_LITERAL = 262,          /* STRING_LITERAL  */
     RW_PAR = 263,                  /* RW_PAR  */
-    RW_NUMERAL = 264,              /* RW_NUMERAL  */
-    RW_DECIMAL = 265,              /* RW_DECIMAL  */
-    RW_STRING = 266,               /* RW_STRING  */
-    RW_UNDERSCORE = 267,           /* RW_UNDERSCORE  */
-    RW_EXCLAMATION = 268,          /* RW_EXCLAMATION  */
-    RW_AS = 269,                   /* RW_AS  */
-    RW_LET = 270,                  /* RW_LET  */
-    RW_FORALL = 271,               /* RW_FORALL  */
-    RW_EXISTS = 272,               /* RW_EXISTS  */
-    RW_SET_LOGIC = 273,            /* RW_SET_LOGIC  */
-    RW_SET_OPTION = 274,           /* RW_SET_OPTION  */
-    RW_SET_INFO = 275,             /* RW_SET_INFO  */
-    RW_DECLARE_SORT = 276,         /* RW_DECLARE_SORT  */
-    RW_DEFINE_SORT = 277,          /* RW_DEFINE_SORT  */
-    RW_EXPAND_SORT = 278,          /* RW_EXPAND_SORT  */
-    RW_DECLARE_CONST = 279,        /* RW_DECLARE_CONST  */
-    RW_DECLARE_FUN = 280,          /* RW_DECLARE_FUN  */
-    RW_DEFINE_FUN = 281,           /* RW_DEFINE_FUN  */
-    RW_EXPAND_TERM = 282,          /* RW_EXPAND_TERM  */
-    RW_PUSH = 283,                 /* RW_PUSH  */
-    RW_POP = 284,                  /* RW_POP  */
-    RW_ASSERT = 285,               /* RW_ASSERT  */
-    RW_CHECK_SAT = 286,            /* RW_CHECK_SAT  */
-    RW_GET_SORT = 287,             /* RW_GET_SORT  */
-    RW_GET_ASSERTIONS = 288,       /* RW_GET_ASSERTIONS  */
-    RW_GET_PROOF = 289,            /* RW_GET_PROOF  */
-    RW_GET_UNSAT_CORE = 290,       /* RW_GET_UNSAT_CORE  */
-    RW_GET_VALUE = 291,            /* RW_GET_VALUE  */
-    RW_GET_ASSIGNMENT = 292,       /* RW_GET_ASSIGNMENT  */
-    RW_GET_OPTION = 293,           /* RW_GET_OPTION  */
-    RW_GET_INFO = 294,             /* RW_GET_INFO  */
-    RW_RESET_ASSERTIONS = 295,     /* RW_RESET_ASSERTIONS  */
-    RW_RESET = 296,                /* RW_RESET  */
-    RW_ECHO = 297,                 /* RW_ECHO  */
-    RW_EXIT = 298,                 /* RW_EXIT  */
-    SYMBOL = 299,                  /* SYMBOL  */
-    KEYWORD = 300                  /* KEYWORD  */
+    RW_UNDERSCORE = 264,           /* RW_UNDERSCORE  */
+    RW_EXCLAMATION = 265,          /* RW_EXCLAMATION  */
+    RW_AS = 266,                   /* RW_AS  */
+    RW_LET = 267,                  /* RW_LET  */
+    RW_FORALL = 268,               /* RW_FORALL  */
+    RW_EXISTS = 269,               /* RW_EXISTS  */
+    RW_SET_LOGIC = 270,            /* RW_SET_LOGIC  */
+    RW_SET_OPTION = 271,           /* RW_SET_OPTION  */
+    RW_SET_INFO = 272,             /* RW_SET_INFO  */
+    RW_DECLARE_SORT = 273,         /* RW_DECLARE_SORT  */
+    RW_DEFINE_SORT = 274,          /* RW_DEFINE_SORT  */
+    RW_EXPAND_SORT = 275,          /* RW_EXPAND_SORT  */
+    RW_DECLARE_CONST = 276,        /* RW_DECLARE_CONST  */
+    RW_DECLARE_FUN = 277,          /* RW_DECLARE_FUN  */
+    RW_DEFINE_FUN = 278,           /* RW_DEFINE_FUN  */
+    RW_EXPAND_TERM = 279,          /* RW_EXPAND_TERM  */
+    RW_PUSH = 280,                 /* RW_PUSH  */
+    RW_POP = 281,                  /* RW_POP  */
+    RW_ASSERT = 282,               /* RW_ASSERT  */
+    RW_CHECK_SAT = 283,            /* RW_CHECK_SAT  */
+    RW_GET_SORT = 284,             /* RW_GET_SORT  */
+    RW_GET_ASSERTIONS = 285,       /* RW_GET_ASSERTIONS  */
+    RW_GET_PROOF = 286,            /* RW_GET_PROOF  */
+    RW_GET_UNSAT_CORE = 287,       /* RW_GET_UNSAT_CORE  */
+    RW_GET_VALUE = 288,            /* RW_GET_VALUE  */
+    RW_GET_ASSIGNMENT = 289,       /* RW_GET_ASSIGNMENT  */
+    RW_GET_OPTION = 290,           /* RW_GET_OPTION  */
+    RW_GET_INFO = 291,             /* RW_GET_INFO  */
+    RW_RESET_ASSERTIONS = 292,     /* RW_RESET_ASSERTIONS  */
+    RW_RESET = 293,                /* RW_RESET  */
+    RW_ECHO = 294,                 /* RW_ECHO  */
+    RW_EXIT = 295,                 /* RW_EXIT  */
+    SYMBOL = 296,                  /* SYMBOL  */
+    KEYWORD = 297                  /* KEYWORD  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -111,49 +108,46 @@ extern int yydebug;
 #define BINARY 261
 #define STRING_LITERAL 262
 #define RW_PAR 263
-#define RW_NUMERAL 264
-#define RW_DECIMAL 265
-#define RW_STRING 266
-#define RW_UNDERSCORE 267
-#define RW_EXCLAMATION 268
-#define RW_AS 269
-#define RW_LET 270
-#define RW_FORALL 271
-#define RW_EXISTS 272
-#define RW_SET_LOGIC 273
-#define RW_SET_OPTION 274
-#define RW_SET_INFO 275
-#define RW_DECLARE_SORT 276
-#define RW_DEFINE_SORT 277
-#define RW_EXPAND_SORT 278
-#define RW_DECLARE_CONST 279
-#define RW_DECLARE_FUN 280
-#define RW_DEFINE_FUN 281
-#define RW_EXPAND_TERM 282
-#define RW_PUSH 283
-#define RW_POP 284
-#define RW_ASSERT 285
-#define RW_CHECK_SAT 286
-#define RW_GET_SORT 287
-#define RW_GET_ASSERTIONS 288
-#define RW_GET_PROOF 289
-#define RW_GET_UNSAT_CORE 290
-#define RW_GET_VALUE 291
-#define RW_GET_ASSIGNMENT 292
-#define RW_GET_OPTION 293
-#define RW_GET_INFO 294
-#define RW_RESET_ASSERTIONS 295
-#define RW_RESET 296
-#define RW_ECHO 297
-#define RW_EXIT 298
-#define SYMBOL 299
-#define KEYWORD 300
+#define RW_UNDERSCORE 264
+#define RW_EXCLAMATION 265
+#define RW_AS 266
+#define RW_LET 267
+#define RW_FORALL 268
+#define RW_EXISTS 269
+#define RW_SET_LOGIC 270
+#define RW_SET_OPTION 271
+#define RW_SET_INFO 272
+#define RW_DECLARE_SORT 273
+#define RW_DEFINE_SORT 274
+#define RW_EXPAND_SORT 275
+#define RW_DECLARE_CONST 276
+#define RW_DECLARE_FUN 277
+#define RW_DEFINE_FUN 278
+#define RW_EXPAND_TERM 279
+#define RW_PUSH 280
+#define RW_POP 281
+#define RW_ASSERT 282
+#define RW_CHECK_SAT 283
+#define RW_GET_SORT 284
+#define RW_GET_ASSERTIONS 285
+#define RW_GET_PROOF 286
+#define RW_GET_UNSAT_CORE 287
+#define RW_GET_VALUE 288
+#define RW_GET_ASSIGNMENT 289
+#define RW_GET_OPTION 290
+#define RW_GET_INFO 291
+#define RW_RESET_ASSERTIONS 292
+#define RW_RESET 293
+#define RW_ECHO 294
+#define RW_EXIT 295
+#define SYMBOL 296
+#define KEYWORD 297
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 116 "parser.ypp"
+#line 113 "parser.ypp"
 
       std::string * str_attr;
       attribute * attr_attr;
@@ -175,7 +169,7 @@ union YYSTYPE
       variable_binding_vector * vb_v_attr;
       expression_vector * term_v_attr;
 
-#line 179 "parser.hpp"
+#line 173 "parser.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

@@ -48,9 +48,6 @@ sorted_variable dummy_var("", sort());
 %token<str_attr> BINARY;
 %token<str_attr> STRING_LITERAL;
 %token RW_PAR;
-%token RW_NUMERAL;
-%token RW_DECIMAL;
-%token RW_STRING;
 %token RW_UNDERSCORE;
 %token RW_EXCLAMATION;
 %token RW_AS;
@@ -254,7 +251,13 @@ command : '(' RW_SET_LOGIC SYMBOL ')'
 	  if(yy_api->print_success())
 	   yy_api->cout() << "success" << std::endl;
 	  delete $3;
-	}	
+	}
+	| '(' RW_PUSH ')'
+	{
+	  yy_api->push(1);
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	}
         | '(' RW_POP NUMERAL ')'
 	{
 	  yy_api->pop(atoi($3->c_str()));
@@ -262,6 +265,13 @@ command : '(' RW_SET_LOGIC SYMBOL ')'
 	   yy_api->cout() << "success" << std::endl;
 	  delete $3;
 	}
+	| '(' RW_POP ')'
+	{
+	  yy_api->pop(1);
+	  if(yy_api->print_success())
+	   yy_api->cout() << "success" << std::endl;
+	}
+
         | '(' RW_ASSERT term ')'
 	{
 	  yy_api->assert_expression(*$3);

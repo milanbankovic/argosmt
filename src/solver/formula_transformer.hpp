@@ -133,7 +133,7 @@ public:
   {
     function_symbol uniq_name(prefix + std::to_string(++_count));
     _sig->add_function_symbol(uniq_name, s);
-    //std::cout << "NEW UNIQUE NAME: " << uniq_name << std::endl;
+    //std::cerr << "NEW UNIQUE NAME: " << uniq_name << std::endl;
     return _exp_factory->create_expression(uniq_name);
   }
 

@@ -23,23 +23,32 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 solver_configuration s_config;
 
 int main(int argc, char ** argv)
-{
-  cmd_line_parser::parse_cmd_line(argc, argv);
-  if(cmd_line_parser::has_config())
+  try
     {
-      s_config.parse_config_file(cmd_line_parser::config_file());
-      cmd_line_parser::close_config();
-    }
-  
-  dimacs_solver_interface dsi;
-
-  if(cmd_line_parser::timeout() != 0)
+      cmd_line_parser::parse_cmd_line(argc, argv);
+      if(cmd_line_parser::has_config())
+	{
+	  s_config.parse_config_file(cmd_line_parser::config_file());
+	  cmd_line_parser::close_config();
+	}
+      
+      dimacs_solver_interface dsi;
+      
+      if(cmd_line_parser::timeout() != 0)
+	{
+	  timeout<>::init_handler();
+	  timeout<>::set_timeout(cmd_line_parser::timeout());
+	}
+      
+      dsi.check_sat();
+      
+      return 0;
+    } catch(const char * s)
     {
-      timeout<>::init_handler();
-      timeout<>::set_timeout(cmd_line_parser::timeout());
+      std::cerr << s << std::endl;
+      exit(1);
+    } catch(...)
+    {
+      std::cerr << "UNKNOWN EXCEPTION" << std::endl;
+      exit(1);
     }
-
-  dsi.check_sat();
-  
-  return 0;
-}

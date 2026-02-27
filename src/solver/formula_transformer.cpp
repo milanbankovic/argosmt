@@ -87,11 +87,10 @@ void formula_transformer::check_definition(const expression & expr, std::vector<
     }
 }
 
-
 void formula_transformer::cnf_transformation(const expression & expr, 
 					     std::vector<clause *> & clauses, 
 					     expression & name)
-{
+{ 
   static const std::string cnf_prefix = std::string("uniq");
   static const std::string ite_prefix = std::string("ite");
   

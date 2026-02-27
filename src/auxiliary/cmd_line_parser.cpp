@@ -29,6 +29,7 @@ std::ifstream cmd_line_parser::_config_file;
 bool cmd_line_parser::_print_reports = false;
 bool cmd_line_parser::_print_statistics = false;
 bool cmd_line_parser::_print_progress = false;
+bool cmd_line_parser::_print_log = false;
 
 #include "config.h"
 
@@ -118,6 +119,10 @@ void cmd_line_parser::parse_cmd_line(int argc, char ** argv)
       else if(std::string("-p") == argv[i] || std::string("--print-progress") == argv[i])
 	{
 	  _print_progress = true;
+	}
+      else if(std::string("-g") == argv[i] || std::string("--print-log") == argv[i])
+	{
+	  _print_log = true;
 	}      
       else if(_input == &std::cin)
 	{

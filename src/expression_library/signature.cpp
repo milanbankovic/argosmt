@@ -99,14 +99,15 @@ bool
 default_function_symbol_checker::
 check_left_associativity(const sort_vector & operand_sorts,
 			 sort & return_sort)
-{
-  if(_rank.size() != 3 || operand_sorts.size() <= 2)
+{  
+  if(_rank.size() != 3) 
     return false;
   
   if(attributes().find(keyword::LEFT_ASSOC) == attributes().end())
     return false;
-  
- 
+
+  if(_rank[0] != _rank[2])
+    return false;
   
   instantiation ins(HASH_TABLE_SIZE);
   
@@ -135,12 +136,15 @@ default_function_symbol_checker::
 check_right_associativity(const sort_vector & operand_sorts,
 			  sort & return_sort)
 {
-  if(_rank.size() != 3 || operand_sorts.size() <= 2)
+  if(_rank.size() != 3)
     return false;
   
   if(attributes().find(keyword::RIGHT_ASSOC) == attributes().end())
     return false;
-    
+
+  if(_rank[1] != _rank[2])
+    return false;
+  
   instantiation ins(HASH_TABLE_SIZE);
   
   if(return_sort != _signature->get_sort_factory()->UNDEFINED_SORT() 
@@ -170,7 +174,7 @@ default_function_symbol_checker::
 check_chainable_pairwise(const sort_vector & operand_sorts,
 			 sort & return_sort)
 {
-  if(_rank.size() != 3 || operand_sorts.size() <= 2)
+  if(_rank.size() != 3 || operand_sorts.size() < 2)
     return false;
   
   
@@ -181,6 +185,9 @@ check_chainable_pairwise(const sort_vector & operand_sorts,
   
   if(return_sort != _signature->get_sort_factory()->UNDEFINED_SORT() && 
      return_sort != _signature->get_sort_factory()->BOOL_SORT())
+    return false;
+
+  if(_rank[0] != _rank[1])
     return false;
   
   instantiation ins(HASH_TABLE_SIZE);
@@ -276,7 +283,7 @@ default_function_symbol_checker::
 check_symbol(const function_symbol & symbol,
 	     const sort_vector & operand_sorts,
 	     sort & return_sort)
-{
+{  
   if(check_regular(operand_sorts, return_sort) ||
      check_left_associativity(operand_sorts, return_sort) ||
      check_right_associativity(operand_sorts, return_sort) ||
